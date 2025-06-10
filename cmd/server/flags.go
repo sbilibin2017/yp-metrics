@@ -7,13 +7,17 @@ import (
 	"github.com/sbilibin2017/yp-metrics/internal/configs"
 )
 
-func parseFlags() *configs.ServerConfig {
+func parseFlags() (*configs.ServerConfig, error) {
 	fs := flag.NewFlagSet("server", flag.ContinueOnError)
 
 	var addr string
 	fs.StringVar(&addr, "a", ":8080", "address and port to run server")
 
-	_ = fs.Parse(os.Args[1:])
+	err := fs.Parse(os.Args[1:])
+
+	if err != nil {
+		return nil, err
+	}
 
 	if envRunAddr := os.Getenv("RUN_ADDR"); envRunAddr != "" {
 		addr = envRunAddr
@@ -22,5 +26,5 @@ func parseFlags() *configs.ServerConfig {
 	return configs.NewServerConfig(
 		configs.WithServerRunAddress(addr),
 		configs.WithServerLogLevel(),
-	)
+	), nil
 }

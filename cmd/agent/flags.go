@@ -8,7 +8,7 @@ import (
 	"github.com/sbilibin2017/yp-metrics/internal/configs"
 )
 
-func parseFlags() *configs.AgentConfig {
+func parseFlags() (*configs.AgentConfig, error) {
 	fs := flag.NewFlagSet("agent", flag.ContinueOnError)
 
 	var (
@@ -21,7 +21,11 @@ func parseFlags() *configs.AgentConfig {
 	fs.IntVar(&pollInterval, "p", 2, "poll interval in seconds")
 	fs.IntVar(&reportInterval, "r", 10, "report interval in seconds")
 
-	_ = fs.Parse(os.Args[1:])
+	err := fs.Parse(os.Args[1:])
+
+	if err != nil {
+		return nil, err
+	}
 
 	if envRunAddr := os.Getenv("RUN_ADDR"); envRunAddr != "" {
 		serverRunAddress = envRunAddr
@@ -45,5 +49,5 @@ func parseFlags() *configs.AgentConfig {
 		configs.WithAgentReportInterval(reportInterval),
 	)
 
-	return cfg
+	return cfg, nil
 }
