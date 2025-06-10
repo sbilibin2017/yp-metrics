@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/sbilibin2017/yp-metrics/internal/configs"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -20,10 +21,15 @@ func (s *MainSuite) SetupSuite() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 
+	cfg := configs.NewServerConfig(
+		configs.WithServerLogLevel("info"),
+		configs.WithServerRunAddress(":8080"),
+	)
+
 	errCh := make(chan error, 1)
 
 	go func() {
-		err := run(ctx)
+		err := run(ctx, cfg)
 		if err != nil && err != context.Canceled {
 			errCh <- err
 			return
@@ -31,15 +37,12 @@ func (s *MainSuite) SetupSuite() {
 		errCh <- nil
 	}()
 
-	// Wait a short time for server startup
 	time.Sleep(200 * time.Millisecond)
 
-	// Check if the goroutine reported any startup error
 	select {
 	case err := <-errCh:
 		s.Require().NoError(err)
 	default:
-		// no error reported yet (server likely running)
 	}
 
 	s.client = resty.New().SetBaseURL("http://localhost:8080")
@@ -77,27 +80,30 @@ func (s *MainSuite) TestUpdateMetric() {
 			metricType:     "invalid",
 			metricName:     "some",
 			metricValue:    "10",
-			expectedStatus: http.StatusBadRequest, // Assuming your router rejects unknown types
+			expectedStatus: http.StatusBadRequest,
 		},
 		{
 			name:           "Invalid value",
 			metricType:     "gauge",
 			metricName:     "pressure",
 			metricValue:    "notanumber",
-			expectedStatus: http.StatusBadRequest, // Assuming handler rejects bad values
+			expectedStatus: http.StatusBadRequest,
 		},
 		{
 			name:           "Value missing",
 			metricType:     "gauge",
 			metricName:     "temperature",
 			metricValue:    "",
-			expectedStatus: http.StatusNotFound,
+			expectedStatus: http.StatusBadRequest,
 		},
 	}
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			url := "/update/" + tt.metricType + "/" + tt.metricName + "/" + tt.metricValue
+			url := "/update/" + tt.metricType + "/" + tt.metricName
+			if tt.metricValue != "" {
+				url += "/" + tt.metricValue
+			}
 			resp, err := s.client.R().Post(url)
 
 			s.Require().NoError(err)

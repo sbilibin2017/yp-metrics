@@ -1,26 +1,80 @@
 package types
 
-// Counter represents a metric type that accumulates counts.
-const (
-	Counter = "counter"
-	// Gauge represents a metric type that measures a value at a point in time.
-	Gauge = "gauge"
+import (
+	"errors"
+	"strconv"
 )
 
-// Metrics represents a single metric data point with its identifier, type, and value.
-// Depending on the metric type, either Delta or Value is set.
-// Delta is used for Counter metrics (int64).
-// Value is used for Gauge metrics (float64).
+const (
+	Counter = "counter"
+	Gauge   = "gauge"
+)
+
 type Metrics struct {
-	ID    string   `json:"id"`              // Metric identifier (name)
-	MType string   `json:"type"`            // Metric type: "counter" or "gauge"
-	Delta *int64   `json:"delta,omitempty"` // Counter metric value (optional)
-	Value *float64 `json:"value,omitempty"` // Gauge metric value (optional)
-	Hash  string   `json:"hash,omitempty"`  // Optional hash for metric integrity verification
+	ID    string   `json:"id"`
+	MType string   `json:"type"`
+	Delta *int64   `json:"delta,omitempty"`
+	Value *float64 `json:"value,omitempty"`
+	Hash  string   `json:"hash,omitempty"`
 }
 
-// MetricID represents the identifier and type of a metric, typically used for referencing a metric.
+type MetricsUpdatePathRequest struct {
+	ID    string `json:"id"`
+	MType string `json:"type"`
+	Value string `json:"value"`
+}
+
+var (
+	ErrNameIsRequired      = errors.New("metric name is required")
+	ErrTypeIsRequired      = errors.New("metric type is required")
+	ErrInvalidMetricType   = errors.New("invalid metric type")
+	ErrValueIsRequired     = errors.New("metric value is required")
+	ErrInvalidGaugeValue   = errors.New("invalid gauge metric value")
+	ErrInvalidCounterValue = errors.New("invalid counter metric value")
+)
+
+func NewMetrics(metricType string, metricName string, metricValue string) (*Metrics, error) {
+	if metricName == "" {
+		return nil, ErrNameIsRequired
+	}
+
+	if metricType == "" {
+		return nil, ErrTypeIsRequired
+	}
+
+	if metricType != Gauge && metricType != Counter {
+		return nil, ErrInvalidMetricType
+	}
+
+	if metricValue == "" {
+		return nil, ErrValueIsRequired
+	}
+
+	metric := &Metrics{
+		ID:    metricName,
+		MType: metricType,
+	}
+
+	switch metricType {
+	case Gauge:
+		val, err := strconv.ParseFloat(metricValue, 64)
+		if err != nil {
+			return nil, ErrInvalidGaugeValue
+		}
+		metric.Value = &val
+
+	case Counter:
+		val, err := strconv.ParseInt(metricValue, 10, 64)
+		if err != nil {
+			return nil, ErrInvalidCounterValue
+		}
+		metric.Delta = &val
+	}
+
+	return metric, nil
+}
+
 type MetricID struct {
-	ID    string `json:"id"`   // Metric identifier (name)
-	MType string `json:"type"` // Metric type: "counter" or "gauge"
+	ID    string `json:"id"`
+	MType string `json:"type"`
 }
