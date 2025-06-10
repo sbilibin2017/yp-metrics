@@ -12,31 +12,31 @@ import (
 	types "github.com/sbilibin2017/yp-metrics/internal/types"
 )
 
-// MockMetricSaver is a mock of MetricSaver interface.
-type MockMetricSaver struct {
+// MockMetricUpdateSaver is a mock of MetricUpdateSaver interface.
+type MockMetricUpdateSaver struct {
 	ctrl     *gomock.Controller
-	recorder *MockMetricSaverMockRecorder
+	recorder *MockMetricUpdateSaverMockRecorder
 }
 
-// MockMetricSaverMockRecorder is the mock recorder for MockMetricSaver.
-type MockMetricSaverMockRecorder struct {
-	mock *MockMetricSaver
+// MockMetricUpdateSaverMockRecorder is the mock recorder for MockMetricUpdateSaver.
+type MockMetricUpdateSaverMockRecorder struct {
+	mock *MockMetricUpdateSaver
 }
 
-// NewMockMetricSaver creates a new mock instance.
-func NewMockMetricSaver(ctrl *gomock.Controller) *MockMetricSaver {
-	mock := &MockMetricSaver{ctrl: ctrl}
-	mock.recorder = &MockMetricSaverMockRecorder{mock}
+// NewMockMetricUpdateSaver creates a new mock instance.
+func NewMockMetricUpdateSaver(ctrl *gomock.Controller) *MockMetricUpdateSaver {
+	mock := &MockMetricUpdateSaver{ctrl: ctrl}
+	mock.recorder = &MockMetricUpdateSaverMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockMetricSaver) EXPECT() *MockMetricSaverMockRecorder {
+func (m *MockMetricUpdateSaver) EXPECT() *MockMetricUpdateSaverMockRecorder {
 	return m.recorder
 }
 
 // Save mocks base method.
-func (m *MockMetricSaver) Save(ctx context.Context, metrics []types.Metrics) error {
+func (m *MockMetricUpdateSaver) Save(ctx context.Context, metrics types.Metrics) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Save", ctx, metrics)
 	ret0, _ := ret[0].(error)
@@ -44,7 +44,45 @@ func (m *MockMetricSaver) Save(ctx context.Context, metrics []types.Metrics) err
 }
 
 // Save indicates an expected call of Save.
-func (mr *MockMetricSaverMockRecorder) Save(ctx, metrics interface{}) *gomock.Call {
+func (mr *MockMetricUpdateSaverMockRecorder) Save(ctx, metrics interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Save", reflect.TypeOf((*MockMetricSaver)(nil).Save), ctx, metrics)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Save", reflect.TypeOf((*MockMetricUpdateSaver)(nil).Save), ctx, metrics)
+}
+
+// MockMetricUpdateGetter is a mock of MetricUpdateGetter interface.
+type MockMetricUpdateGetter struct {
+	ctrl     *gomock.Controller
+	recorder *MockMetricUpdateGetterMockRecorder
+}
+
+// MockMetricUpdateGetterMockRecorder is the mock recorder for MockMetricUpdateGetter.
+type MockMetricUpdateGetterMockRecorder struct {
+	mock *MockMetricUpdateGetter
+}
+
+// NewMockMetricUpdateGetter creates a new mock instance.
+func NewMockMetricUpdateGetter(ctrl *gomock.Controller) *MockMetricUpdateGetter {
+	mock := &MockMetricUpdateGetter{ctrl: ctrl}
+	mock.recorder = &MockMetricUpdateGetterMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockMetricUpdateGetter) EXPECT() *MockMetricUpdateGetterMockRecorder {
+	return m.recorder
+}
+
+// Get mocks base method.
+func (m *MockMetricUpdateGetter) Get(ctx context.Context, id types.MetricID) (*types.Metrics, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Get", ctx, id)
+	ret0, _ := ret[0].(*types.Metrics)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Get indicates an expected call of Get.
+func (mr *MockMetricUpdateGetterMockRecorder) Get(ctx, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockMetricUpdateGetter)(nil).Get), ctx, id)
 }

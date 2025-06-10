@@ -1,6 +1,7 @@
 package types
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -115,4 +116,82 @@ func TestNewMetrics(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNewMetricID(t *testing.T) {
+	tests := []struct {
+		name      string
+		mType     string
+		id        string
+		wantID    *MetricID
+		wantError error
+	}{
+		{"valid gauge", Gauge, "load", &MetricID{ID: "load", MType: Gauge}, nil},
+		{"valid counter", Counter, "hits", &MetricID{ID: "hits", MType: Counter}, nil},
+		{"empty id", Gauge, "", nil, ErrNameIsRequired},
+		{"empty type", "", "load", nil, ErrTypeIsRequired},
+		{"invalid type", "invalid", "load", nil, ErrInvalidMetricType},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewMetricID(tt.mType, tt.id)
+			if tt.wantError != nil {
+				assert.ErrorIs(t, err, tt.wantError)
+				assert.Nil(t, got)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.wantID, got)
+			}
+		})
+	}
+}
+
+func TestGetMetricValueString(t *testing.T) {
+	gVal := 12.34
+	cVal := int64(42)
+
+	tests := []struct {
+		name      string
+		metric    Metrics
+		wantValue string
+		wantErr   error
+	}{
+		{"valid gauge", Metrics{MType: Gauge, Value: &gVal}, "12.34", nil},
+		{"valid counter", Metrics{MType: Counter, Delta: &cVal}, "42", nil},
+		{"nil gauge value", Metrics{MType: Gauge}, "", ErrNilMetricValue},
+		{"nil counter delta", Metrics{MType: Counter}, "", ErrNilMetricValue},
+		{"unknown type", Metrics{MType: "unknown"}, "", ErrUnknownMType},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := GetMetricValueString(tt.metric)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				assert.Empty(t, got)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.wantValue, got)
+			}
+		})
+	}
+}
+
+func TestGetMetricsHTML(t *testing.T) {
+	gVal := 5.5
+	cVal := int64(10)
+
+	metrics := []Metrics{
+		{ID: "load", MType: Gauge, Value: &gVal},
+		{ID: "hits", MType: Counter, Delta: &cVal},
+		{ID: "bad", MType: Gauge},
+	}
+
+	html, err := GetMetricsHTML(metrics)
+	assert.NoError(t, err)
+	assert.True(t, strings.HasPrefix(html, "<!DOCTYPE html>"))
+	assert.Contains(t, html, "load (gauge): 5.5")
+	assert.Contains(t, html, "hits (counter): 10")
+	assert.NotContains(t, html, "bad")
 }

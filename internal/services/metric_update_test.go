@@ -1,4 +1,4 @@
-package services
+package services_test
 
 import (
 	"context"
@@ -6,99 +6,107 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/assert"
-
+	"github.com/sbilibin2017/yp-metrics/internal/services"
 	"github.com/sbilibin2017/yp-metrics/internal/types"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMetricUpdateService_Update(t *testing.T) {
-	ptrInt64 := func(i int64) *int64 {
-		return &i
+	type fields struct {
+		setupMocks func(*services.MockMetricUpdateSaver, *services.MockMetricUpdateGetter)
 	}
+	type args struct {
+		metrics types.Metrics
+	}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	tests := []struct {
-		name     string
-		input    []types.Metrics
-		expected []types.Metrics
-		setup    func(ctrl *gomock.Controller) MetricSaver
-		wantErr  bool
+		name        string
+		fields      fields
+		args        args
+		wantErr     error
+		expectedVal int64
 	}{
 		{
-			name: "overwrite gauge metric",
-			input: []types.Metrics{
-				{ID: "foo", MType: types.Gauge, Delta: ptrInt64(10)},
-				{ID: "foo", MType: types.Gauge, Delta: ptrInt64(20)},
+			name: "counter metric - existing value added",
+			fields: fields{
+				setupMocks: func(saver *services.MockMetricUpdateSaver, getter *services.MockMetricUpdateGetter) {
+					getter.EXPECT().Get(gomock.Any(), types.MetricID{ID: "requests", MType: types.Counter}).
+						Return(&types.Metrics{ID: "requests", MType: types.Counter, Delta: int64Ptr(5)}, nil)
+					saver.EXPECT().Save(gomock.Any(), types.Metrics{ID: "requests", MType: types.Counter, Delta: int64Ptr(15)}).
+						Return(nil)
+				},
 			},
-			expected: []types.Metrics{
-				{ID: "foo", MType: types.Gauge, Delta: ptrInt64(20)}, // overwritten by last
+			args: args{
+				metrics: types.Metrics{ID: "requests", MType: types.Counter, Delta: int64Ptr(10)},
 			},
-			setup: func(ctrl *gomock.Controller) MetricSaver {
-				mockSaver := NewMockMetricSaver(ctrl)
-				mockSaver.EXPECT().
-					Save(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(_ context.Context, got []types.Metrics) error {
-						assert.ElementsMatch(t, []types.Metrics{
-							{ID: "foo", MType: types.Gauge, Delta: ptrInt64(20)},
-						}, got)
-						return nil
-					})
-				return mockSaver
-			},
+			wantErr:     nil,
+			expectedVal: 15,
 		},
 		{
-			name: "sum counter metrics",
-			input: []types.Metrics{
-				{ID: "bar", MType: types.Counter, Delta: ptrInt64(2)},
-				{ID: "bar", MType: types.Counter, Delta: ptrInt64(3)},
+			name: "getter fails",
+			fields: fields{
+				setupMocks: func(saver *services.MockMetricUpdateSaver, getter *services.MockMetricUpdateGetter) {
+					getter.EXPECT().Get(gomock.Any(), types.MetricID{ID: "fail_metric", MType: types.Counter}).
+						Return(nil, errors.New("db error"))
+				},
 			},
-			expected: []types.Metrics{
-				{ID: "bar", MType: types.Counter, Delta: ptrInt64(5)}, // sum 2 + 3
+			args: args{
+				metrics: types.Metrics{ID: "fail_metric", MType: types.Counter, Delta: int64Ptr(2)},
 			},
-			setup: func(ctrl *gomock.Controller) MetricSaver {
-				mockSaver := NewMockMetricSaver(ctrl)
-				mockSaver.EXPECT().
-					Save(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(_ context.Context, got []types.Metrics) error {
-						assert.ElementsMatch(t, []types.Metrics{
-							{ID: "bar", MType: types.Counter, Delta: ptrInt64(5)},
-						}, got)
-						return nil
-					})
-				return mockSaver
-			},
+			wantErr: types.ErrInternalServerError,
 		},
 		{
-			name: "save error propagates",
-			input: []types.Metrics{
-				{ID: "fail", MType: types.Counter, Delta: ptrInt64(1)},
+			name: "gauge metric - saved directly",
+			fields: fields{
+				setupMocks: func(saver *services.MockMetricUpdateSaver, getter *services.MockMetricUpdateGetter) {
+					saver.EXPECT().Save(gomock.Any(), types.Metrics{ID: "temp", MType: types.Gauge, Value: float64Ptr(42.42)}).
+						Return(nil)
+				},
 			},
-			expected: nil,
-			setup: func(ctrl *gomock.Controller) MetricSaver {
-				mockSaver := NewMockMetricSaver(ctrl)
-				mockSaver.EXPECT().
-					Save(gomock.Any(), gomock.Any()).
-					Return(errors.New("save failed"))
-				return mockSaver
+			args: args{
+				metrics: types.Metrics{ID: "temp", MType: types.Gauge, Value: float64Ptr(42.42)},
 			},
-			wantErr: true,
+			wantErr:     nil,
+			expectedVal: 0,
+		},
+		{
+			name: "save fails",
+			fields: fields{
+				setupMocks: func(saver *services.MockMetricUpdateSaver, getter *services.MockMetricUpdateGetter) {
+					saver.EXPECT().Save(gomock.Any(), gomock.Any()).
+						Return(errors.New("save error"))
+				},
+			},
+			args: args{
+				metrics: types.Metrics{ID: "some", MType: types.Gauge, Value: float64Ptr(100)},
+			},
+			wantErr: errors.New("save error"),
 		},
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
+			mockSaver := services.NewMockMetricUpdateSaver(ctrl)
+			mockGetter := services.NewMockMetricUpdateGetter(ctrl)
+			tt.fields.setupMocks(mockSaver, mockGetter)
 
-			mockSaver := tt.setup(ctrl)
-			svc := NewMetricUpdateService(mockSaver)
+			svc := services.NewMetricUpdateService(mockSaver, mockGetter)
+			err := svc.Update(context.Background(), tt.args.metrics)
 
-			err := svc.Update(context.Background(), tt.input)
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
+			assert.Equal(t, tt.wantErr, err)
+			if tt.args.metrics.MType == types.Counter && tt.wantErr == nil {
+				assert.Equal(t, tt.expectedVal, *tt.args.metrics.Delta)
 			}
 		})
 	}
+}
+
+// helpers
+func int64Ptr(v int64) *int64 {
+	return &v
+}
+func float64Ptr(v float64) *float64 {
+	return &v
 }

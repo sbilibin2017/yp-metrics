@@ -9,17 +9,16 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-type MetricUpdater interface {
-	Update(ctx context.Context, metrics types.Metrics) error
+type MetricGetterPath interface {
+	Get(ctx context.Context, id types.MetricID) (*types.Metrics, error)
 }
 
-func MetricUpdatePathHandler(svc MetricUpdater) http.HandlerFunc {
+func MetricGetPathHandler(svc MetricGetterPath) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		metricType := chi.URLParam(r, "type")
 		metricName := chi.URLParam(r, "name")
-		metricValue := chi.URLParam(r, "value")
 
-		metric, err := types.NewMetrics(metricType, metricName, metricValue)
+		metricID, err := types.NewMetricID(metricType, metricName)
 		if err != nil {
 			switch err {
 			case types.ErrNameIsRequired:
@@ -27,18 +26,34 @@ func MetricUpdatePathHandler(svc MetricUpdater) http.HandlerFunc {
 			case types.ErrInvalidMetricType,
 				types.ErrInvalidGaugeValue,
 				types.ErrInvalidCounterValue,
-				types.ErrTypeIsRequired,
-				types.ErrValueIsRequired:
+				types.ErrTypeIsRequired:
 				http.Error(w, err.Error(), http.StatusBadRequest)
 			}
 			return
 		}
 
-		if err := svc.Update(r.Context(), *metric); err != nil {
+		metric, err := svc.Get(r.Context(), *metricID)
+
+		if err != nil {
 			http.Error(w, types.ErrInternalServerError.Error(), http.StatusInternalServerError)
 			return
 		}
 
+		if metric == nil {
+			http.Error(w, types.ErrMetricNotFound.Error(), http.StatusNotFound)
+			return
+
+		}
+
+		valueString, err := types.GetMetricValueString(*metric)
+
+		if err != nil {
+			http.Error(w, types.ErrInternalServerError.Error(), http.StatusInternalServerError)
+			return
+
+		}
+
 		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(valueString))
 	}
 }
