@@ -18,9 +18,9 @@ func NewAgentConfig(opts ...AgentOption) *AgentConfig {
 	return cfg
 }
 
-func WithAgentLogLevel(level string) AgentOption {
+func WithAgentLogLevel() AgentOption {
 	return func(cfg *AgentConfig) {
-		cfg.LogLevel = level
+		cfg.LogLevel = "info"
 	}
 }
 
@@ -42,8 +42,8 @@ func WithAgentReportInterval(interval int) AgentOption {
 	}
 }
 
-func WithAgentServerEndpoint(endpoint string) AgentOption {
+func WithAgentServerEndpoint() AgentOption {
 	return func(cfg *AgentConfig) {
-		cfg.ServerEndpoint = endpoint
+		cfg.ServerEndpoint = "/update"
 	}
 }

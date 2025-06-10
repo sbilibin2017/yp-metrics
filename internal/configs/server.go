@@ -15,9 +15,9 @@ func NewServerConfig(opts ...ServerOption) *ServerConfig {
 	return cfg
 }
 
-func WithServerLogLevel(level string) ServerOption {
+func WithServerLogLevel() ServerOption {
 	return func(cfg *ServerConfig) {
-		cfg.LogLevel = level
+		cfg.LogLevel = "info"
 	}
 }
 
