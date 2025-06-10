@@ -78,8 +78,11 @@ func TestMetricMemorySaveRepository_Save(t *testing.T) {
 			initialData := make(map[types.MetricID]types.Metrics)
 			repo := NewMetricMemorySaveRepository(initialData)
 
-			err := repo.Save(context.Background(), tt.metrics)
-			assert.NoError(t, err)
+			for _, m := range tt.metrics {
+				err := repo.Save(context.Background(), m)
+				assert.NoError(t, err)
+			}
+
 			assert.Equal(t, tt.expected, repo.data)
 		})
 	}

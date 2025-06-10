@@ -20,14 +20,10 @@ func NewMetricMemorySaveRepository(
 
 func (r *MetricMemorySaveRepository) Save(
 	ctx context.Context,
-	metrics []types.Metrics,
+	metrics types.Metrics,
 ) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
-	for _, metric := range metrics {
-		r.data[types.MetricID{ID: metric.ID, MType: metric.MType}] = metric
-	}
-
+	r.data[types.MetricID{ID: metrics.ID, MType: metrics.MType}] = metrics
 	return nil
 }

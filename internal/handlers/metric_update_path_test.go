@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	gomock "github.com/golang/mock/gomock"
+	"github.com/golang/mock/gomock"
 	"github.com/sbilibin2017/yp-metrics/internal/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -51,9 +51,11 @@ func TestMetricUpdateHandler(t *testing.T) {
 			mockUpdate: func() {
 				val := 23.5
 				mockUpdater.EXPECT().
-					Update(gomock.Any(), gomock.Eq([]types.Metrics{
-						{ID: "temperature", MType: types.Gauge, Value: &val},
-					})).
+					Update(gomock.Any(), types.Metrics{
+						ID:    "temperature",
+						MType: types.Gauge,
+						Value: &val,
+					}).
 					Return(nil)
 			},
 			wantStatusCode: http.StatusOK,
@@ -62,7 +64,7 @@ func TestMetricUpdateHandler(t *testing.T) {
 			name: "missing metric name",
 			url:  "/update/gauge//23.5",
 			mockUpdate: func() {
-				// Should not call Update since metric parsing fails
+				// Should not call Update
 			},
 			wantStatusCode: http.StatusNotFound,
 		},
@@ -70,7 +72,7 @@ func TestMetricUpdateHandler(t *testing.T) {
 			name: "invalid metric type",
 			url:  "/update/foo/temperature/23.5",
 			mockUpdate: func() {
-				// Should not call Update since metric parsing fails
+				// Should not call Update
 			},
 			wantStatusCode: http.StatusBadRequest,
 		},
@@ -80,9 +82,11 @@ func TestMetricUpdateHandler(t *testing.T) {
 			mockUpdate: func() {
 				val := int64(10)
 				mockUpdater.EXPECT().
-					Update(gomock.Any(), gomock.Eq([]types.Metrics{
-						{ID: "requests", MType: types.Counter, Delta: &val},
-					})).
+					Update(gomock.Any(), types.Metrics{
+						ID:    "requests",
+						MType: types.Counter,
+						Delta: &val,
+					}).
 					Return(errors.New("update failed"))
 			},
 			wantStatusCode: http.StatusInternalServerError,
@@ -93,14 +97,13 @@ func TestMetricUpdateHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.mockUpdate()
 
-			handler := MetricUpdateHandler(mockUpdater)
+			handler := MetricUpdatePathHandler(mockUpdater)
 			req := makeRequest("POST", tt.url)
 			rec := httptest.NewRecorder()
 
 			handler.ServeHTTP(rec, req)
 
 			assert.Equal(t, tt.wantStatusCode, rec.Code)
-
 		})
 	}
 }

@@ -53,14 +53,27 @@ func run(ctx context.Context, config *configs.ServerConfig) error {
 
 func newServer(config *configs.ServerConfig) (*http.Server, error) {
 	data := make(map[types.MetricID]types.Metrics)
-	metricRepo := repositories.NewMetricMemorySaveRepository(data)
 
-	metricService := services.NewMetricUpdateService(metricRepo)
-	metricHandler := handlers.MetricUpdateHandler(metricService)
+	metricMemorySaveRepository := repositories.NewMetricMemorySaveRepository(data)
+	metricMemoryGetRepository := repositories.NewMetricMemoryGetRepository(data)
+	metricMemoryListRepository := repositories.NewMetricMemoryListRepository(data)
+
+	metricUpdateService := services.NewMetricUpdateService(metricMemorySaveRepository, metricMemoryGetRepository)
+	metricGetService := services.NewMetricGetService(metricMemoryGetRepository)
+	metricListService := services.NewMetricListService(metricMemoryListRepository)
+
+	metricUpdatePathHandler := handlers.MetricUpdatePathHandler(metricUpdateService)
+	metricGetPathHandler := handlers.MetricGetPathHandler(metricGetService)
+	metricListHTMLHandler := handlers.MetricListHTMLHandler(metricListService)
 
 	router := chi.NewRouter()
-	router.Post("/update/{type}/{name}/{value}", metricHandler)
-	router.Post("/update/{type}/{name}", metricHandler)
+	router.Post("/update/{type}/{name}/{value}", metricUpdatePathHandler)
+	router.Post("/update/{type}/{name}", metricUpdatePathHandler)
+
+	router.Get("/value/{type}/{name}", metricGetPathHandler)
+	router.Get("/value/{type}", metricGetPathHandler)
+
+	router.Get("/", metricListHTMLHandler)
 
 	return &http.Server{
 		Addr:    config.RunAddress,
