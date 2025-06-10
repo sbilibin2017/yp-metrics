@@ -11,23 +11,8 @@ import (
 	"github.com/sbilibin2017/yp-metrics/internal/workers"
 )
 
-var (
-	logLevel         string = "info"
-	serverRunAddress string = ":8080"
-	serverEndpoint   string = "/update"
-	pollInterval     int    = 2
-	reportInterval   int    = 10
-)
-
 func main() {
-	config := configs.NewAgentConfig(
-		configs.WithAgentLogLevel(logLevel),
-		configs.WithAgentServerRunAddress(serverRunAddress),
-		configs.WithAgentServerEndpoint(serverEndpoint),
-		configs.WithAgentPollInterval(pollInterval),
-		configs.WithAgentReportInterval(reportInterval),
-	)
-
+	config := parseFlags()
 	if err := run(context.Background(), config); err != nil {
 		panic(err)
 	}

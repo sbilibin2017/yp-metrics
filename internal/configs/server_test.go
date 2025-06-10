@@ -15,9 +15,9 @@ func TestNewServerConfig_Default(t *testing.T) {
 }
 
 func TestWithLogLevel(t *testing.T) {
-	cfg := NewServerConfig(WithServerLogLevel("debug"))
+	cfg := NewServerConfig(WithServerLogLevel())
 
-	assert.Equal(t, "debug", cfg.LogLevel)
+	assert.Equal(t, "info", cfg.LogLevel)
 	assert.Empty(t, cfg.RunAddress)
 }
 
@@ -30,7 +30,7 @@ func TestWithRunAddress(t *testing.T) {
 
 func TestWithLogLevelAndRunAddress(t *testing.T) {
 	cfg := NewServerConfig(
-		WithServerLogLevel("info"),
+		WithServerLogLevel(),
 		WithServerRunAddress(":8080"),
 	)
 

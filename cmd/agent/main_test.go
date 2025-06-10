@@ -32,9 +32,9 @@ func (s *AgentSuite) SetupSuite() {
 	s.cancel = cancel
 
 	cfg := configs.NewAgentConfig(
-		configs.WithAgentLogLevel("info"),
+		configs.WithAgentLogLevel(),
 		configs.WithAgentServerRunAddress(s.stubServer.URL),
-		configs.WithAgentServerEndpoint("/update"),
+		configs.WithAgentServerEndpoint(),
 		configs.WithAgentPollInterval(1),
 		configs.WithAgentReportInterval(2),
 	)

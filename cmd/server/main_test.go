@@ -22,7 +22,7 @@ func (s *MainSuite) SetupSuite() {
 	s.cancel = cancel
 
 	cfg := configs.NewServerConfig(
-		configs.WithServerLogLevel("info"),
+		configs.WithServerLogLevel(),
 		configs.WithServerRunAddress(":8080"),
 	)
 

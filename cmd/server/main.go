@@ -14,17 +14,8 @@ import (
 	"github.com/sbilibin2017/yp-metrics/internal/types"
 )
 
-var (
-	logLevel   string = "info"
-	runAddress string = ":8080"
-)
-
 func main() {
-	config := configs.NewServerConfig(
-		configs.WithServerLogLevel(logLevel),
-		configs.WithServerRunAddress(runAddress),
-	)
-
+	config := parseFlags()
 	if err := run(context.Background(), config); err != nil {
 		panic(err)
 	}
