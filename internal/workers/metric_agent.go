@@ -20,29 +20,27 @@ type MetricsUpdater interface {
 	Update(ctx context.Context, req types.Metrics) error
 }
 
-func NewMetricAgentWorker(
+func StartMetricAgentWorker(
+	ctx context.Context,
 	metricsUpdater MetricsUpdater,
 	pollInterval int,
 	reportInterval int,
-) func(ctx context.Context) error {
-	return func(ctx context.Context) error {
-		pollMetricsCh := pollMetrics(
-			ctx,
-			[]func() []types.Metrics{
-				collectRuntimeCounterMetrics,
-				collectRuntimeGaugeMetrics,
-			},
-			pollInterval,
-		)
-		reportMetricsCh := reportMetrics(
-			ctx,
-			metricsUpdater,
-			reportInterval,
-			pollMetricsCh,
-		)
-		logResults(ctx, reportMetricsCh)
-		return nil
-	}
+) {
+	pollMetricsCh := pollMetrics(
+		ctx,
+		[]func() []types.Metrics{
+			collectRuntimeCounterMetrics,
+			collectRuntimeGaugeMetrics,
+		},
+		pollInterval,
+	)
+	reportMetricsCh := reportMetrics(
+		ctx,
+		metricsUpdater,
+		reportInterval,
+		pollMetricsCh,
+	)
+	logResults(ctx, reportMetricsCh)
 }
 
 func pollMetrics(
@@ -103,6 +101,7 @@ func pollMetricsFanOut(
 	ch := make(chan types.Metrics)
 
 	go func() {
+		logger.Log.Info("pollMetricsFanOut started")
 		ticker := time.NewTicker(time.Duration(pollInterval) * time.Second)
 		defer ticker.Stop()
 		defer close(ch)
@@ -110,9 +109,11 @@ func pollMetricsFanOut(
 		for {
 			select {
 			case <-ctx.Done():
+				logger.Log.Info("pollMetricsFanOut stopped due to context cancellation")
 				return
 			case <-ticker.C:
 				metrics := collector()
+				logger.Log.Infof("pollMetricsFanOut polled %d metrics", len(metrics))
 				for _, m := range metrics {
 					ch <- m
 				}
@@ -234,7 +235,7 @@ func logResults(ctx context.Context, results <-chan metricsUpdateResult) {
 			if res.Err != nil {
 				logger.Log.Errorf("Failed to update metric %s (%s): %v", res.Request.ID, res.Request.MType, res.Err)
 			} else {
-				logger.Log.Infof("Successfully updated metric %s (%s): %s", res.Request.ID, res.Request.MType, res.Request.Value)
+				logger.Log.Infof("Successfully updated metric %s (%s)", res.Request.ID, res.Request.MType)
 			}
 		}
 	}

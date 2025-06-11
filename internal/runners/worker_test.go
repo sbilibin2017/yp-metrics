@@ -2,7 +2,6 @@ package runners
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -13,37 +12,29 @@ func TestRunWorker_FinishNormally(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	workerCalled := false
-	worker := func(ctx context.Context) error {
-		workerCalled = true
+	workerCalled := make(chan struct{})
+	worker := func(ctx context.Context) {
 		time.Sleep(100 * time.Millisecond)
-		return nil
+		close(workerCalled)
 	}
 
-	RunWorker(ctx, worker)
+	go RunWorker(ctx, worker)
 
-	assert.True(t, workerCalled, "worker should have been called")
-}
-
-func TestRunWorker_WorkerReturnsError(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	worker := func(ctx context.Context) error {
-		return errors.New("some error")
+	select {
+	case <-workerCalled:
+		assert.True(t, true, "worker should have been called")
+	case <-time.After(time.Second):
+		t.Fatal("worker was not called in time")
 	}
-
-	RunWorker(ctx, worker)
 }
 
 func TestRunWorker_ContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	workerStarted := make(chan struct{})
-	worker := func(ctx context.Context) error {
+	worker := func(ctx context.Context) {
 		close(workerStarted)
 		<-ctx.Done()
-		return nil
 	}
 
 	go func() {
@@ -53,5 +44,5 @@ func TestRunWorker_ContextCancelled(t *testing.T) {
 
 	RunWorker(ctx, worker)
 
-	assert.True(t, true)
+	assert.True(t, true, "RunWorker should return after context cancellation")
 }

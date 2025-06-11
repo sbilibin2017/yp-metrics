@@ -2,14 +2,136 @@ package main
 
 import (
 	"context"
+	"flag"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/sbilibin2017/yp-metrics/internal/configs"
 	"github.com/stretchr/testify/suite"
 )
+
+func resetFlags() {
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+}
+
+func TestParseFlags_Defaults(t *testing.T) {
+	resetFlags()
+	os.Unsetenv("ADDRESS")
+	os.Unsetenv("STORE_INTERVAL")
+	os.Unsetenv("FILE_STORAGE_PATH")
+	os.Unsetenv("RESTORE")
+
+	// Simulate no command-line flags
+	os.Args = []string{"cmd"}
+
+	parseFlags()
+
+	if addr != ":8080" {
+		t.Errorf("expected default addr ':8080', got %q", addr)
+	}
+	if storeInterval != 300 {
+		t.Errorf("expected default storeInterval 300, got %d", storeInterval)
+	}
+	if fileStoragePath != "./data/metrics.json" {
+		t.Errorf("expected default fileStoragePath './data/metrics.json', got %q", fileStoragePath)
+	}
+	if restore != true {
+		t.Errorf("expected default restore true, got %v", restore)
+	}
+}
+
+func TestParseFlags_WithFlags(t *testing.T) {
+	resetFlags()
+	os.Unsetenv("ADDRESS")
+	os.Unsetenv("STORE_INTERVAL")
+	os.Unsetenv("FILE_STORAGE_PATH")
+	os.Unsetenv("RESTORE")
+
+	os.Args = []string{
+		"cmd",
+		"-a", ":9090",
+		"-i", "100",
+		"-f", "/tmp/metrics.json",
+		"-r=false",
+	}
+
+	parseFlags()
+
+	if addr != ":9090" {
+		t.Errorf("expected addr ':9090', got %q", addr)
+	}
+	if storeInterval != 100 {
+		t.Errorf("expected storeInterval 100, got %d", storeInterval)
+	}
+	if fileStoragePath != "/tmp/metrics.json" {
+		t.Errorf("expected fileStoragePath '/tmp/metrics.json', got %q", fileStoragePath)
+	}
+	if restore != false {
+		t.Errorf("expected restore false, got %v", restore)
+	}
+}
+
+func TestParseFlags_EnvOverridesFlags(t *testing.T) {
+	resetFlags()
+
+	os.Setenv("ADDRESS", ":7070")
+	os.Setenv("STORE_INTERVAL", "150")
+	os.Setenv("FILE_STORAGE_PATH", "/env/metrics.json")
+	os.Setenv("RESTORE", "false")
+
+	os.Args = []string{
+		"cmd",
+		"-a", ":9090",
+		"-i", "100",
+		"-f", "/tmp/metrics.json",
+		"-r=true",
+	}
+
+	parseFlags()
+
+	if addr != ":7070" {
+		t.Errorf("expected addr ':7070' from env, got %q", addr)
+	}
+	if storeInterval != 150 {
+		t.Errorf("expected storeInterval 150 from env, got %d", storeInterval)
+	}
+	if fileStoragePath != "/env/metrics.json" {
+		t.Errorf("expected fileStoragePath '/env/metrics.json' from env, got %q", fileStoragePath)
+	}
+	if restore != false {
+		t.Errorf("expected restore false from env, got %v", restore)
+	}
+
+	os.Unsetenv("ADDRESS")
+	os.Unsetenv("STORE_INTERVAL")
+	os.Unsetenv("FILE_STORAGE_PATH")
+	os.Unsetenv("RESTORE")
+}
+
+func TestParseFlags_InvalidEnvValues(t *testing.T) {
+	resetFlags()
+
+	// Set invalid environment variables to check fallback behavior
+	os.Setenv("STORE_INTERVAL", "invalidint")
+	os.Setenv("RESTORE", "notabool")
+
+	os.Args = []string{"cmd"}
+
+	parseFlags()
+
+	// Expect defaults since invalid env values should not override
+	if storeInterval != 300 {
+		t.Errorf("expected default storeInterval 300 with invalid env, got %d", storeInterval)
+	}
+	if restore != true {
+		t.Errorf("expected default restore true with invalid env, got %v", restore)
+	}
+
+	os.Unsetenv("STORE_INTERVAL")
+	os.Unsetenv("RESTORE")
+}
 
 type MainSuite struct {
 	suite.Suite
@@ -21,29 +143,21 @@ func (s *MainSuite) SetupSuite() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 
-	cfg := configs.NewServerConfig(
-		configs.WithServerLogLevel(),
-		configs.WithServerRunAddress(":8080"),
-	)
-
-	errCh := make(chan error, 1)
+	// Set globals expected by run()
+	addr = ":8080"
+	storeInterval = 1 // or your preferred test value
+	fileStoragePath = "./testdata/metrics.json"
+	restore = false
+	logLevel = "info"
 
 	go func() {
-		err := run(ctx, cfg)
+		err := run(ctx)
 		if err != nil && err != context.Canceled {
-			errCh <- err
-			return
+			s.Require().NoError(err)
 		}
-		errCh <- nil
 	}()
 
 	time.Sleep(200 * time.Millisecond)
-
-	select {
-	case err := <-errCh:
-		s.Require().NoError(err)
-	default:
-	}
 
 	s.client = resty.New().SetBaseURL("http://localhost:8080")
 }
@@ -51,6 +165,9 @@ func (s *MainSuite) SetupSuite() {
 func (s *MainSuite) TearDownSuite() {
 	s.cancel()
 	time.Sleep(50 * time.Millisecond)
+
+	err := os.RemoveAll("./testdata")
+	s.Require().NoError(err)
 }
 
 func (s *MainSuite) TestUpdateMetric() {

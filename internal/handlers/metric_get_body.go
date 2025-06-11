@@ -41,7 +41,6 @@ func MetricGetBodyHandler(
 			return
 		}
 
-		// Fetch metric
 		metric, err := svc.Get(r.Context(), metricID)
 		if err != nil {
 			http.Error(w, types.ErrInternalServerError.Error(), http.StatusInternalServerError)
