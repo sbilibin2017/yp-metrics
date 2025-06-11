@@ -43,21 +43,21 @@ func StartMetricServerWorker(
 		<-ctx.Done()
 		saveMetricsToFile(ctx, ml, fs)
 		return
-	}
+	} else {
+		logger.Log.Infof("Starting periodic saving every %d seconds", storeInterval)
+		ticker := time.NewTicker(time.Duration(storeInterval) * time.Second)
+		defer ticker.Stop()
 
-	logger.Log.Infof("Starting periodic saving every %d seconds", storeInterval)
-	ticker := time.NewTicker(time.Duration(storeInterval) * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Log.Info("Context canceled, saving metrics before shutdown...")
-			saveMetricsToFile(ctx, ml, fs)
-			return
-		case <-ticker.C:
-			logger.Log.Debug("Timer tick: saving metrics to file...")
-			saveMetricsToFile(ctx, ml, fs)
+		for {
+			select {
+			case <-ctx.Done():
+				logger.Log.Info("Context canceled, saving metrics before shutdown...")
+				saveMetricsToFile(ctx, ml, fs)
+				return
+			case <-ticker.C:
+				logger.Log.Debug("Timer tick: saving metrics to file...")
+				saveMetricsToFile(ctx, ml, fs)
+			}
 		}
 	}
 }

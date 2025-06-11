@@ -62,7 +62,7 @@ func TestPollMetrics(t *testing.T) {
 
 	pollInterval := 1
 
-	outCh := pollMetrics(ctx, []func() []types.Metrics{collector}, pollInterval)
+	outCh := pollMetrics(ctx, pollInterval, []func() []types.Metrics{collector})
 
 	select {
 	case m := <-outCh:

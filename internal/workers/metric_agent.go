@@ -4,7 +4,6 @@ import (
 	"context"
 	"math/rand/v2"
 	"runtime"
-	"sync"
 	"time"
 
 	"github.com/sbilibin2017/yp-metrics/internal/logger"
@@ -28,11 +27,11 @@ func StartMetricAgentWorker(
 ) {
 	pollMetricsCh := pollMetrics(
 		ctx,
+		pollInterval,
 		[]func() []types.Metrics{
 			collectRuntimeCounterMetrics,
 			collectRuntimeGaugeMetrics,
 		},
-		pollInterval,
 	)
 	reportMetricsCh := reportMetrics(
 		ctx,
@@ -43,85 +42,32 @@ func StartMetricAgentWorker(
 	logResults(ctx, reportMetricsCh)
 }
 
-func pollMetrics(
-	ctx context.Context,
-	collectors []func() []types.Metrics,
-	pollInterval int,
-) <-chan types.Metrics {
-	out := make(chan types.Metrics)
+func pollMetrics(ctx context.Context, pollInterval int, collectors []func() []types.Metrics) <-chan types.Metrics {
+	metricsCh := make(chan types.Metrics)
 
 	go func() {
-		defer close(out)
-
-		var allChans []<-chan types.Metrics
-		for _, collector := range collectors {
-			ch := pollMetricsFanOut(ctx, collector, pollInterval)
-			allChans = append(allChans, ch)
-		}
-
-		merged := pollMetricsFanIn(allChans)
-
-		for m := range merged {
-			out <- m
-		}
-	}()
-
-	return out
-}
-
-func pollMetricsFanIn(chans []<-chan types.Metrics) <-chan types.Metrics {
-	var wg sync.WaitGroup
-	merged := make(chan types.Metrics)
-
-	output := func(c <-chan types.Metrics) {
-		defer wg.Done()
-		for m := range c {
-			merged <- m
-		}
-	}
-
-	wg.Add(len(chans))
-	for _, ch := range chans {
-		go output(ch)
-	}
-
-	go func() {
-		wg.Wait()
-		close(merged)
-	}()
-
-	return merged
-}
-
-func pollMetricsFanOut(
-	ctx context.Context,
-	collector func() []types.Metrics,
-	pollInterval int,
-) <-chan types.Metrics {
-	ch := make(chan types.Metrics)
-
-	go func() {
-		logger.Log.Info("pollMetricsFanOut started")
+		defer close(metricsCh)
 		ticker := time.NewTicker(time.Duration(pollInterval) * time.Second)
 		defer ticker.Stop()
-		defer close(ch)
 
 		for {
 			select {
 			case <-ctx.Done():
-				logger.Log.Info("pollMetricsFanOut stopped due to context cancellation")
+				logger.Log.Info("pollMetricsLoop stopped due to context cancellation")
 				return
 			case <-ticker.C:
-				metrics := collector()
-				logger.Log.Infof("pollMetricsFanOut polled %d metrics", len(metrics))
-				for _, m := range metrics {
-					ch <- m
+				for _, collector := range collectors {
+					metrics := collector()
+					logger.Log.Infof("Collected %d metrics", len(metrics))
+					for _, m := range metrics {
+						metricsCh <- m
+					}
 				}
 			}
 		}
 	}()
 
-	return ch
+	return metricsCh
 }
 
 func collectRuntimeGaugeMetrics() []types.Metrics {
