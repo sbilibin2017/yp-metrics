@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/sbilibin2017/yp-metrics/internal/configs"
 	"github.com/sbilibin2017/yp-metrics/internal/handlers"
+	"github.com/sbilibin2017/yp-metrics/internal/middlewares"
 	"github.com/sbilibin2017/yp-metrics/internal/repositories"
 	"github.com/sbilibin2017/yp-metrics/internal/routers"
 	"github.com/sbilibin2017/yp-metrics/internal/services"
@@ -46,10 +47,15 @@ func NewServerContainer(config *configs.ServerConfig) (*ServerContainer, error) 
 	metricGetPathHandler := handlers.MetricGetPathHandler(metricGetService)
 	metricListHTMLHandler := handlers.MetricListHTMLHandler(metricListService)
 
+	middlewares := []func(http.Handler) http.Handler{
+		middlewares.LoggingMiddleware,
+	}
+
 	metricsRouter := routers.NewMetricsRouter(
 		metricUpdatePathHandler,
 		metricGetPathHandler,
 		metricListHTMLHandler,
+		middlewares...,
 	)
 
 	srv := &http.Server{
