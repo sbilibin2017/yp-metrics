@@ -2,28 +2,32 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
 	"github.com/sbilibin2017/yp-metrics/internal/types"
 	"github.com/sbilibin2017/yp-metrics/internal/validators"
-
-	"github.com/go-chi/chi/v5"
 )
 
-type MetricGetterPath interface {
+type MetricGetterBody interface {
 	Get(ctx context.Context, id types.MetricID) (*types.Metrics, error)
 }
 
-func MetricGetPathHandler(
+func MetricGetBodyHandler(
 	val func(metricType string, metricName string) error,
-	svc MetricGetterPath,
+	svc MetricGetterBody,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		metricType := chi.URLParam(r, "type")
-		metricName := chi.URLParam(r, "name")
+		var metricID types.MetricID
 
-		err := val(metricType, metricName)
+		dec := json.NewDecoder(r.Body)
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&metricID); err != nil {
+			http.Error(w, "Invalid JSON body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
 
+		err := val(metricID.MType, metricID.ID)
 		if err != nil {
 			switch err {
 			case validators.ErrNameIsRequired:
@@ -31,15 +35,14 @@ func MetricGetPathHandler(
 			case validators.ErrInvalidMetricType,
 				validators.ErrTypeIsRequired:
 				http.Error(w, err.Error(), http.StatusBadRequest)
+			default:
+				http.Error(w, types.ErrInternalServerError.Error(), http.StatusInternalServerError)
 			}
 			return
-
 		}
 
-		metricID := types.NewMetricID(metricType, metricName)
-
-		metric, err := svc.Get(r.Context(), *metricID)
-
+		// Fetch metric
+		metric, err := svc.Get(r.Context(), metricID)
 		if err != nil {
 			http.Error(w, types.ErrInternalServerError.Error(), http.StatusInternalServerError)
 			return
@@ -48,18 +51,14 @@ func MetricGetPathHandler(
 		if metric == nil {
 			http.Error(w, types.ErrMetricNotFound.Error(), http.StatusNotFound)
 			return
-
 		}
 
-		valueString, err := types.GetMetricValueString(*metric)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
 
-		if err != nil {
+		if err := json.NewEncoder(w).Encode(metric); err != nil {
 			http.Error(w, types.ErrInternalServerError.Error(), http.StatusInternalServerError)
 			return
-
 		}
-
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(valueString))
 	}
 }

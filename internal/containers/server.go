@@ -11,6 +11,7 @@ import (
 	"github.com/sbilibin2017/yp-metrics/internal/routers"
 	"github.com/sbilibin2017/yp-metrics/internal/services"
 	"github.com/sbilibin2017/yp-metrics/internal/types"
+	"github.com/sbilibin2017/yp-metrics/internal/validators"
 )
 
 type ServerContainer struct {
@@ -43,8 +44,10 @@ func NewServerContainer(config *configs.ServerConfig) (*ServerContainer, error) 
 	metricGetService := services.NewMetricGetService(metricMemoryGetRepository)
 	metricListService := services.NewMetricListService(metricMemoryListRepository)
 
-	metricUpdatePathHandler := handlers.MetricUpdatePathHandler(metricUpdateService)
-	metricGetPathHandler := handlers.MetricGetPathHandler(metricGetService)
+	metricUpdatePathHandler := handlers.MetricUpdatePathHandler(validators.ValidateMetricPath, metricUpdateService)
+	metricUpdateBodyHandler := handlers.MetricUpdateBodyHandler(validators.ValidateMetricBody, metricUpdateService)
+	metricGetPathHandler := handlers.MetricGetPathHandler(validators.ValidateMetricIDPath, metricGetService)
+	metricGetBodyHandler := handlers.MetricGetBodyHandler(validators.ValidateMetricIDPath, metricGetService)
 	metricListHTMLHandler := handlers.MetricListHTMLHandler(metricListService)
 
 	middlewares := []func(http.Handler) http.Handler{
@@ -53,7 +56,9 @@ func NewServerContainer(config *configs.ServerConfig) (*ServerContainer, error) 
 
 	metricsRouter := routers.NewMetricsRouter(
 		metricUpdatePathHandler,
+		metricUpdateBodyHandler,
 		metricGetPathHandler,
+		metricGetBodyHandler,
 		metricListHTMLHandler,
 		middlewares...,
 	)

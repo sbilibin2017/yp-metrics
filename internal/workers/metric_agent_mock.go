@@ -36,7 +36,7 @@ func (m *MockMetricsUpdater) EXPECT() *MockMetricsUpdaterMockRecorder {
 }
 
 // Update mocks base method.
-func (m *MockMetricsUpdater) Update(ctx context.Context, req types.MetricsUpdatePathRequest) error {
+func (m *MockMetricsUpdater) Update(ctx context.Context, req types.Metrics) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Update", ctx, req)
 	ret0, _ := ret[0].(error)

@@ -34,7 +34,6 @@ func (s *AgentSuite) SetupSuite() {
 	cfg := configs.NewAgentConfig(
 		configs.WithAgentLogLevel(),
 		configs.WithAgentServerRunAddress(s.stubServer.URL),
-		configs.WithAgentServerEndpoint(),
 		configs.WithAgentPollInterval(1),
 		configs.WithAgentReportInterval(2),
 	)

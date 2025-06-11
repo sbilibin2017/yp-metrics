@@ -17,10 +17,17 @@ func dummyHandler(status int, body string) http.HandlerFunc {
 
 func TestNewMetricsRouter(t *testing.T) {
 	updateHandler := dummyHandler(http.StatusOK, "update OK")
-	getHandler := dummyHandler(http.StatusOK, "get OK")
+	getPathHandler := dummyHandler(http.StatusOK, "get path OK")
+	getBodyHandler := dummyHandler(http.StatusOK, "get body OK")
 	listHandler := dummyHandler(http.StatusOK, "list OK")
 
-	router := NewMetricsRouter(updateHandler, getHandler, listHandler)
+	router := NewMetricsRouter(
+		updateHandler,
+		updateHandler,
+		getPathHandler,
+		getBodyHandler,
+		listHandler,
+	)
 
 	tests := []struct {
 		name           string
@@ -44,18 +51,32 @@ func TestNewMetricsRouter(t *testing.T) {
 			expectedBody:   "update OK",
 		},
 		{
+			name:           "POST /update/",
+			method:         http.MethodPost,
+			url:            "/update/",
+			expectedStatus: http.StatusOK,
+			expectedBody:   "update OK",
+		},
+		{
 			name:           "GET /value/{type}/{name}",
 			method:         http.MethodGet,
 			url:            "/value/counter/testMetric",
 			expectedStatus: http.StatusOK,
-			expectedBody:   "get OK",
+			expectedBody:   "get path OK",
 		},
 		{
 			name:           "GET /value/{type}",
 			method:         http.MethodGet,
 			url:            "/value/counter",
 			expectedStatus: http.StatusOK,
-			expectedBody:   "get OK",
+			expectedBody:   "get path OK",
+		},
+		{
+			name:           "POST /value/",
+			method:         http.MethodPost,
+			url:            "/value/",
+			expectedStatus: http.StatusOK,
+			expectedBody:   "get body OK",
 		},
 		{
 			name:           "GET /",

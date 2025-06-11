@@ -2,28 +2,32 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
 	"github.com/sbilibin2017/yp-metrics/internal/types"
 	"github.com/sbilibin2017/yp-metrics/internal/validators"
-
-	"github.com/go-chi/chi/v5"
 )
 
-type MetricUpdater interface {
-	Update(ctx context.Context, metrics types.Metrics) error
+type MetricUpdaterBody interface {
+	Update(ctx context.Context, metric types.Metrics) error
 }
 
-func MetricUpdatePathHandler(
-	val func(metricType string, metricName string, metricValue string) error,
-	svc MetricUpdater,
+func MetricUpdateBodyHandler(
+	val func(m types.Metrics) error,
+	svc MetricUpdaterBody,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		metricType := chi.URLParam(r, "type")
-		metricName := chi.URLParam(r, "name")
-		metricValue := chi.URLParam(r, "value")
+		var metric types.Metrics
 
-		err := val(metricType, metricName, metricValue)
+		dec := json.NewDecoder(r.Body)
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&metric); err != nil {
+			http.Error(w, "Invalid JSON body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		err := val(metric)
 
 		if err != nil {
 			switch err {
@@ -40,13 +44,16 @@ func MetricUpdatePathHandler(
 
 		}
 
-		metric := types.NewMetrics(metricType, metricName, metricValue)
-
-		if err := svc.Update(r.Context(), *metric); err != nil {
+		if err := svc.Update(r.Context(), metric); err != nil {
 			http.Error(w, types.ErrInternalServerError.Error(), http.StatusInternalServerError)
 			return
 		}
 
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(metric); err != nil {
+			http.Error(w, types.ErrInternalServerError.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 }

@@ -3,8 +3,6 @@ package facades
 import (
 	"context"
 	"fmt"
-	"net/url"
-	"path"
 	"strings"
 
 	"github.com/go-resty/resty/v2"
@@ -17,32 +15,25 @@ type MetricUpdateFacade struct {
 	serverEndpoint string
 }
 
-func NewMetricUpdateFacade(client *resty.Client, serverAddr string, serverEndpoint string) *MetricUpdateFacade {
+func NewMetricUpdateFacade(client *resty.Client, serverAddr string) *MetricUpdateFacade {
 	return &MetricUpdateFacade{
-		client:         client,
-		serverAddr:     serverAddr,
-		serverEndpoint: serverEndpoint,
+		client:     client,
+		serverAddr: serverAddr,
 	}
 }
 
-func (f *MetricUpdateFacade) Update(ctx context.Context, req types.MetricsUpdatePathRequest) error {
+func (f *MetricUpdateFacade) Update(ctx context.Context, req types.Metrics) error {
 	addr := f.serverAddr
 	if !strings.HasPrefix(addr, "http://") && !strings.HasPrefix(addr, "https://") {
 		addr = "http://" + addr
 	}
-
-	baseURL, err := url.Parse(addr)
-	if err != nil {
-		return fmt.Errorf("invalid server address: %w", err)
-	}
-
-	baseURL.Path = path.Join(baseURL.Path, f.serverEndpoint, req.MType, req.ID, req.Value)
-
-	fullURL := baseURL.String()
+	addr += "/update/"
 
 	resp, err := f.client.R().
 		SetContext(ctx).
-		Post(fullURL)
+		SetBody(req).
+		SetHeader("Content-Type", "application/json").
+		Post(addr)
 
 	if err != nil {
 		return err

@@ -83,12 +83,18 @@
 │   │   ├── metric_get_path.go       # Обработчик получения метрик по URL пути
 │   │   ├── metric_get_path_mock.go  # Моки для тестов обработчика получения
 │   │   ├── metric_get_path_test.go  # Тесты обработчика получения метрик
+│   │   ├── metric_get_body.go       # Обработчик получения метрик в теле
+│   │   ├── metric_get_body_mock.go  # Моки для тестов обработчика получения
+│   │   ├── metric_get_body_test.go  # Тесты обработчика получения метрик
 │   │   ├── metric_list.go           # Обработчик списка метрик (HTML)
 │   │   ├── metric_list_mock.go      # Моки для тестов списка метрик
 │   │   ├── metric_list_test.go      # Тесты списка метрик
 │   │   ├── metric_update_path.go    # Обработчик обновления метрик по URL пути
 │   │   ├── metric_update_path_mock.go # Моки для тестов обновления
 │   │   └── metric_update_path_test.go # Тесты обновления метрик
+│   │   ├── metric_update_body.go    # Обработчик обновления метрик в теле
+│   │   ├── metric_update_body_mock.go # Моки для тестов обновления
+│   │   └── metric_update_body_test.go # Тесты обновления метрик
 │   ├── logger                     # Подсистема логирования
 │   │   ├── logger.go                # Инициализация и настройка логгера
 │   │   └── logger_test.go           # Тесты подсистемы логирования
@@ -157,6 +163,7 @@
 | iter4    | Добавление флагов для конфигурирования серва и агнта   | https://github.com/sbilibin2017/yp-metrics/pull/4|
 | iter5    | Добавление приоритета конфигураций (env>flag>default)  | https://github.com/sbilibin2017/yp-metrics/pull/5|
 | iter6    | Добавление logging middleware для логирования запросов и ответов сервера  | https://github.com/sbilibin2017/yp-metrics/pull/6|
+| iter7    | Добавление обновление и получение метрик в теле запроса | https://github.com/sbilibin2017/yp-metrics/pull/7|
 
 ---
 

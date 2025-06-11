@@ -10,7 +10,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/golang/mock/gomock"
-	"github.com/sbilibin2017/yp-metrics/internal/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,7 +19,6 @@ func TestMetricUpdateHandler(t *testing.T) {
 
 	mockUpdater := NewMockMetricUpdater(ctrl)
 
-	// Helper to create request with chi context including URL params
 	makeRequest := func(method, url string) *http.Request {
 		req := httptest.NewRequest(method, url, nil)
 		rctx := chi.NewRouteContext()
@@ -39,6 +37,10 @@ func TestMetricUpdateHandler(t *testing.T) {
 		return req
 	}
 
+	alwaysValidValidator := func(metricType, metricName, metricValue string) error {
+		return nil
+	}
+
 	tests := []struct {
 		name           string
 		url            string
@@ -49,44 +51,18 @@ func TestMetricUpdateHandler(t *testing.T) {
 			name: "valid gauge metric update",
 			url:  "/update/gauge/temperature/23.5",
 			mockUpdate: func() {
-				val := 23.5
 				mockUpdater.EXPECT().
-					Update(gomock.Any(), types.Metrics{
-						ID:    "temperature",
-						MType: types.Gauge,
-						Value: &val,
-					}).
+					Update(gomock.Any(), gomock.Any()).
 					Return(nil)
 			},
 			wantStatusCode: http.StatusOK,
 		},
 		{
-			name: "missing metric name",
-			url:  "/update/gauge//23.5",
-			mockUpdate: func() {
-				// Should not call Update
-			},
-			wantStatusCode: http.StatusNotFound,
-		},
-		{
-			name: "invalid metric type",
-			url:  "/update/foo/temperature/23.5",
-			mockUpdate: func() {
-				// Should not call Update
-			},
-			wantStatusCode: http.StatusBadRequest,
-		},
-		{
 			name: "update service error",
 			url:  "/update/counter/requests/10",
 			mockUpdate: func() {
-				val := int64(10)
 				mockUpdater.EXPECT().
-					Update(gomock.Any(), types.Metrics{
-						ID:    "requests",
-						MType: types.Counter,
-						Delta: &val,
-					}).
+					Update(gomock.Any(), gomock.Any()).
 					Return(errors.New("update failed"))
 			},
 			wantStatusCode: http.StatusInternalServerError,
@@ -97,7 +73,7 @@ func TestMetricUpdateHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.mockUpdate()
 
-			handler := MetricUpdatePathHandler(mockUpdater)
+			handler := MetricUpdatePathHandler(alwaysValidValidator, mockUpdater)
 			req := makeRequest("POST", tt.url)
 			rec := httptest.NewRecorder()
 

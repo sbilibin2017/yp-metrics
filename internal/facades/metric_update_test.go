@@ -20,12 +20,13 @@ func TestMetricUpdateFacade_Update_Success(t *testing.T) {
 	defer ts.Close()
 
 	client := resty.New()
-	facade := NewMetricUpdateFacade(client, ts.URL, "/update")
+	facade := NewMetricUpdateFacade(client, ts.URL)
 
-	req := types.MetricsUpdatePathRequest{
+	val := 42.0
+	req := types.Metrics{
 		ID:    "metric1",
-		MType: "gauge",
-		Value: "42",
+		MType: types.Gauge,
+		Value: &val,
 	}
 
 	err := facade.Update(context.Background(), req)
@@ -40,12 +41,13 @@ func TestMetricUpdateFacade_Update_HTTPError(t *testing.T) {
 	defer ts.Close()
 
 	client := resty.New()
-	facade := NewMetricUpdateFacade(client, ts.URL, "/update")
+	facade := NewMetricUpdateFacade(client, ts.URL)
 
-	req := types.MetricsUpdatePathRequest{
+	val := int64(10)
+	req := types.Metrics{
 		ID:    "metric1",
-		MType: "counter",
-		Value: "10",
+		MType: types.Counter,
+		Delta: &val,
 	}
 
 	err := facade.Update(context.Background(), req)
@@ -60,15 +62,16 @@ func TestMetricUpdateFacade_Update_ContextCanceled(t *testing.T) {
 	defer ts.Close()
 
 	client := resty.New()
-	facade := NewMetricUpdateFacade(client, ts.URL, "/update")
+	facade := NewMetricUpdateFacade(client, ts.URL)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	req := types.MetricsUpdatePathRequest{
+	val := 100.0
+	req := types.Metrics{
 		ID:    "metric1",
-		MType: "gauge",
-		Value: "100",
+		MType: types.Gauge,
+		Value: &val,
 	}
 
 	err := facade.Update(ctx, req)
@@ -87,30 +90,15 @@ func TestMetricUpdateFacade_AddsHTTPPrefix(t *testing.T) {
 	addr = strings.TrimPrefix(addr, "https://")
 
 	client := resty.New()
-	facade := NewMetricUpdateFacade(client, addr, "/update")
+	facade := NewMetricUpdateFacade(client, addr)
 
-	req := types.MetricsUpdatePathRequest{
+	val := 42.0
+	req := types.Metrics{
 		ID:    "metric1",
-		MType: "gauge",
-		Value: "42",
+		MType: types.Gauge,
+		Value: &val,
 	}
 
 	err := facade.Update(context.Background(), req)
 	assert.NoError(t, err)
-}
-
-func TestMetricUpdateFacade_Update_InvalidServerAddr(t *testing.T) {
-	client := resty.New()
-
-	facade := NewMetricUpdateFacade(client, "http://%41:8080", "/update")
-
-	req := types.MetricsUpdatePathRequest{
-		ID:    "metric1",
-		MType: "gauge",
-		Value: "42",
-	}
-
-	err := facade.Update(context.Background(), req)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid server address")
 }

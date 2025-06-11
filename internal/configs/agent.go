@@ -41,9 +41,3 @@ func WithAgentReportInterval(interval int) AgentOption {
 		cfg.ReportInterval = interval
 	}
 }
-
-func WithAgentServerEndpoint() AgentOption {
-	return func(cfg *AgentConfig) {
-		cfg.ServerEndpoint = "/update"
-	}
-}
