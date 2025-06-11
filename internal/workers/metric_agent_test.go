@@ -62,7 +62,7 @@ func TestPollMetrics(t *testing.T) {
 
 	pollInterval := 1
 
-	outCh := pollMetrics(ctx, []func() []types.Metrics{collector}, pollInterval)
+	outCh := pollMetrics(ctx, pollInterval, []func() []types.Metrics{collector})
 
 	select {
 	case m := <-outCh:
@@ -304,9 +304,7 @@ func TestStartMetricAgentWorker(t *testing.T) {
 	pollInterval := 1
 	reportInterval := 1
 
-	w := NewMetricAgentWorker(mockUpdater, pollInterval, reportInterval)
-
-	go w(ctx)
+	go StartMetricAgentWorker(ctx, mockUpdater, pollInterval, reportInterval)
 
 	time.Sleep(1500 * time.Millisecond)
 

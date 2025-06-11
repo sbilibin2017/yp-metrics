@@ -110,17 +110,6 @@
 │   │   ├── metric_memory_list_test.go # Тесты списка метрик
 │   │   ├── metric_memory_save.go    # Сохранение метрик в память
 │   │   └── metric_memory_save_test.go # Тесты сохранения метрик
-│   ├── routers                   # Маршрутизаторы HTTP-запросов
-│   │   ├── metrics.go              # Определение маршрутов для метрик
-│   │   └── metrics_test.go         # Тесты маршрутов
-│   ├── runners                   # Запуск и управление компонентами (сервер, агент, воркеры)
-│   │   ├── context.go              # Управление контекстом с отменой
-│   │   ├── context_test.go         # Тесты контекста
-│   │   ├── http_server.go          # Запуск HTTP-сервера
-│   │   ├── http_server_mock.go     # Моки HTTP-сервера
-│   │   ├── http_server_test.go     # Тесты HTTP-сервера
-│   │   ├── worker.go               # Запуск фоновых воркеров
-│   │   └── worker_test.go          # Тесты воркеров
 │   ├── services                 # Бизнес-логика работы с метриками
 │   │   ├── metric_get.go           # Логика получения метрик
 │   │   ├── metric_get_mock.go      # Моки для сервиса получения
@@ -138,6 +127,9 @@
 │       ├── metric_agent.go         # Воркер агента (сбор и отправка метрик)
 │       ├── metric_agent_mock.go    # Моки для воркера агента
 │       └── metric_agent_test.go    # Тесты воркера агента
+|       ├── metric_server.go        # Воркер сервера (сбор и отправка метрик)
+│       ├── metric_server_mock.go   # Моки для воркера сервера
+│       └── metric_server_test.go   # Тесты воркера сервера
 ├── Makefile                      # Скрипты для сборки, тестирования и запуска
 └── README.md                     # Документация проекта
 ```
@@ -167,6 +159,7 @@
 | iter6    | Добавление logging middleware для логирования запросов и ответов сервера  | https://github.com/sbilibin2017/yp-metrics/pull/6|
 | iter7    | Добавление обновление и получение метрик в теле запроса | https://github.com/sbilibin2017/yp-metrics/pull/7|
 | iter8    | Добавление gzip middleware для зжатия/разжатия запросов/ответов | https://github.com/sbilibin2017/yp-metrics/pull/8|
+| iter9    | Добавление загрузки и сохранения метрик сервером из файла | https://github.com/sbilibin2017/yp-metrics/pull/9|
 
 ---
 

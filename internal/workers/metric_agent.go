@@ -4,7 +4,6 @@ import (
 	"context"
 	"math/rand/v2"
 	"runtime"
-	"sync"
 	"time"
 
 	"github.com/sbilibin2017/yp-metrics/internal/logger"
@@ -20,107 +19,55 @@ type MetricsUpdater interface {
 	Update(ctx context.Context, req types.Metrics) error
 }
 
-func NewMetricAgentWorker(
+func StartMetricAgentWorker(
+	ctx context.Context,
 	metricsUpdater MetricsUpdater,
 	pollInterval int,
 	reportInterval int,
-) func(ctx context.Context) error {
-	return func(ctx context.Context) error {
-		pollMetricsCh := pollMetrics(
-			ctx,
-			[]func() []types.Metrics{
-				collectRuntimeCounterMetrics,
-				collectRuntimeGaugeMetrics,
-			},
-			pollInterval,
-		)
-		reportMetricsCh := reportMetrics(
-			ctx,
-			metricsUpdater,
-			reportInterval,
-			pollMetricsCh,
-		)
-		logResults(ctx, reportMetricsCh)
-		return nil
-	}
+) {
+	pollMetricsCh := pollMetrics(
+		ctx,
+		pollInterval,
+		[]func() []types.Metrics{
+			collectRuntimeCounterMetrics,
+			collectRuntimeGaugeMetrics,
+		},
+	)
+	reportMetricsCh := reportMetrics(
+		ctx,
+		metricsUpdater,
+		reportInterval,
+		pollMetricsCh,
+	)
+	logResults(ctx, reportMetricsCh)
 }
 
-func pollMetrics(
-	ctx context.Context,
-	collectors []func() []types.Metrics,
-	pollInterval int,
-) <-chan types.Metrics {
-	out := make(chan types.Metrics)
+func pollMetrics(ctx context.Context, pollInterval int, collectors []func() []types.Metrics) <-chan types.Metrics {
+	metricsCh := make(chan types.Metrics)
 
 	go func() {
-		defer close(out)
-
-		var allChans []<-chan types.Metrics
-		for _, collector := range collectors {
-			ch := pollMetricsFanOut(ctx, collector, pollInterval)
-			allChans = append(allChans, ch)
-		}
-
-		merged := pollMetricsFanIn(allChans)
-
-		for m := range merged {
-			out <- m
-		}
-	}()
-
-	return out
-}
-
-func pollMetricsFanIn(chans []<-chan types.Metrics) <-chan types.Metrics {
-	var wg sync.WaitGroup
-	merged := make(chan types.Metrics)
-
-	output := func(c <-chan types.Metrics) {
-		defer wg.Done()
-		for m := range c {
-			merged <- m
-		}
-	}
-
-	wg.Add(len(chans))
-	for _, ch := range chans {
-		go output(ch)
-	}
-
-	go func() {
-		wg.Wait()
-		close(merged)
-	}()
-
-	return merged
-}
-
-func pollMetricsFanOut(
-	ctx context.Context,
-	collector func() []types.Metrics,
-	pollInterval int,
-) <-chan types.Metrics {
-	ch := make(chan types.Metrics)
-
-	go func() {
+		defer close(metricsCh)
 		ticker := time.NewTicker(time.Duration(pollInterval) * time.Second)
 		defer ticker.Stop()
-		defer close(ch)
 
 		for {
 			select {
 			case <-ctx.Done():
+				logger.Log.Info("pollMetricsLoop stopped due to context cancellation")
 				return
 			case <-ticker.C:
-				metrics := collector()
-				for _, m := range metrics {
-					ch <- m
+				for _, collector := range collectors {
+					metrics := collector()
+					logger.Log.Infof("Collected %d metrics", len(metrics))
+					for _, m := range metrics {
+						metricsCh <- m
+					}
 				}
 			}
 		}
 	}()
 
-	return ch
+	return metricsCh
 }
 
 func collectRuntimeGaugeMetrics() []types.Metrics {
@@ -234,7 +181,7 @@ func logResults(ctx context.Context, results <-chan metricsUpdateResult) {
 			if res.Err != nil {
 				logger.Log.Errorf("Failed to update metric %s (%s): %v", res.Request.ID, res.Request.MType, res.Err)
 			} else {
-				logger.Log.Infof("Successfully updated metric %s (%s): %s", res.Request.ID, res.Request.MType, res.Request.Value)
+				logger.Log.Infof("Successfully updated metric %s (%s)", res.Request.ID, res.Request.MType)
 			}
 		}
 	}
