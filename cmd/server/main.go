@@ -20,6 +20,9 @@ import (
 	"github.com/sbilibin2017/yp-metrics/internal/types"
 	"github.com/sbilibin2017/yp-metrics/internal/validators"
 	"github.com/sbilibin2017/yp-metrics/internal/workers"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jmoiron/sqlx"
 )
 
 func main() {
@@ -35,7 +38,13 @@ var (
 	storeInterval   int
 	fileStoragePath string
 	restore         bool
-	logLevel        string = "info"
+	databaseDSN     string
+)
+
+var (
+	db       *sqlx.DB
+	err      error
+	logLevel string = "info"
 )
 
 func parseFlags() {
@@ -43,6 +52,7 @@ func parseFlags() {
 	flag.IntVar(&storeInterval, "i", 300, "store interval in seconds (0 = synchronous write)")
 	flag.StringVar(&fileStoragePath, "f", "./data/metrics.json", "file storage path")
 	flag.BoolVar(&restore, "r", true, "restore metrics from file at startup")
+	flag.StringVar(&databaseDSN, "d", "", "PostgreSQL DSN")
 
 	flag.Parse()
 
@@ -65,6 +75,10 @@ func parseFlags() {
 			restore = v
 		}
 	}
+
+	if envDSN := os.Getenv("DATABASE_DSN"); envDSN != "" {
+		databaseDSN = envDSN
+	}
 }
 
 func run(ctx context.Context) error {
@@ -72,7 +86,22 @@ func run(ctx context.Context) error {
 		return err
 	}
 
+	ctx, stop := signal.NotifyContext(
+		ctx,
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		syscall.SIGQUIT,
+	)
+	defer stop()
+
 	data := make(map[types.MetricID]types.Metrics)
+
+	if databaseDSN != "" {
+		db, err = sqlx.ConnectContext(ctx, "pgx", databaseDSN)
+		if err != nil {
+			return err
+		}
+	}
 
 	metricMemorySaveRepository := repositories.NewMetricMemorySaveRepository(data)
 	metricFileSaveRepository := repositories.NewMetricFileSaveRepository(fileStoragePath)
@@ -108,18 +137,12 @@ func run(ctx context.Context) error {
 
 	router.Get("/", metricListHTMLHandler)
 
+	router.Get("/ping", pingHandler(db))
+
 	srv := &http.Server{
 		Addr:    addr,
 		Handler: router,
 	}
-
-	ctx, stop := signal.NotifyContext(
-		ctx,
-		syscall.SIGINT,
-		syscall.SIGTERM,
-		syscall.SIGQUIT,
-	)
-	defer stop()
 
 	go workers.StartMetricServerWorker(
 		ctx,
@@ -163,5 +186,20 @@ func run(ctx context.Context) error {
 			logger.Log.Errorw("Server exited with error", "error", err)
 		}
 		return err
+	}
+}
+
+func pingHandler(db *sqlx.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+
+		if err := db.PingContext(ctx); err != nil {
+			http.Error(w, "Database connection error", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
 	}
 }
