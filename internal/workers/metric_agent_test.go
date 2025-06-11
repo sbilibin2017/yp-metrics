@@ -244,7 +244,13 @@ func TestLogResults(t *testing.T) {
 	defer cancel()
 
 	results := make(chan metricsUpdateResult)
-	logResults(ctx, results)
+
+	done := make(chan struct{})
+	go func() {
+		logResults(ctx, results)
+		close(done)
+	}()
+
 	results <- metricsUpdateResult{
 		Request: types.MetricsUpdatePathRequest{
 			ID:    "metric_success",
@@ -253,6 +259,7 @@ func TestLogResults(t *testing.T) {
 		},
 		Err: nil,
 	}
+
 	results <- metricsUpdateResult{
 		Request: types.MetricsUpdatePathRequest{
 			ID:    "metric_fail",
@@ -261,17 +268,29 @@ func TestLogResults(t *testing.T) {
 		},
 		Err: errors.New("some error"),
 	}
+
 	close(results)
-	time.Sleep(50 * time.Millisecond)
-	cancel()
+
+	<-done
 }
 
 func TestLogResults_ContextDone(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	results := make(chan metricsUpdateResult)
-	logResults(ctx, results)
+
+	done := make(chan struct{})
+	go func() {
+		logResults(ctx, results)
+		close(done)
+	}()
+
 	cancel()
-	time.Sleep(50 * time.Millisecond)
+
+	select {
+	case <-done:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("logResults did not stop after context was canceled")
+	}
 }
 
 func TestStartMetricAgentWorker(t *testing.T) {
