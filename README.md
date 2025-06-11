@@ -101,7 +101,9 @@
 │   ├── middlewares                # Middlewares
 │   │   ├── logging.go               # Логирование запросов и ответов сервера
 │   │   └── logging_test.go          # Тесты логирование запросов и ответов сервера
-│   ├── repositories              # Репозитории — хранение и извлечение метрик
+│   │   ├── gzip.go                  # Сжатие и разжатие запросов и ответов сервера
+│   │   └── gzip_test.go             # Тесты сжатия и разжатия запросов и ответов сервера
+│   ├── repositories               # Репозитории — хранение и извлечение метрик
 │   │   ├── metric_memory_get.go     # Получение метрик из памяти
 │   │   ├── metric_memory_get_test.go# Тесты получения метрик из памяти
 │   │   ├── metric_memory_list.go    # Получение списка метрик из памяти
@@ -164,6 +166,7 @@
 | iter5    | Добавление приоритета конфигураций (env>flag>default)  | https://github.com/sbilibin2017/yp-metrics/pull/5|
 | iter6    | Добавление logging middleware для логирования запросов и ответов сервера  | https://github.com/sbilibin2017/yp-metrics/pull/6|
 | iter7    | Добавление обновление и получение метрик в теле запроса | https://github.com/sbilibin2017/yp-metrics/pull/7|
+| iter8    | Добавление gzip middleware для зжатия/разжатия запросов/ответов | https://github.com/sbilibin2017/yp-metrics/pull/8|
 
 ---
 

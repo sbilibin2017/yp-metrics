@@ -52,6 +52,7 @@ func NewServerContainer(config *configs.ServerConfig) (*ServerContainer, error) 
 
 	middlewares := []func(http.Handler) http.Handler{
 		middlewares.LoggingMiddleware,
+		middlewares.GzipMiddleware,
 	}
 
 	metricsRouter := routers.NewMetricsRouter(

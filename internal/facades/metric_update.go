@@ -1,7 +1,10 @@
 package facades
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -29,10 +32,17 @@ func (f *MetricUpdateFacade) Update(ctx context.Context, req types.Metrics) erro
 	}
 	addr += "/update/"
 
+	compressedBody, err := compressBody(req)
+
+	if err != nil {
+		return err
+	}
+
 	resp, err := f.client.R().
 		SetContext(ctx).
-		SetBody(req).
+		SetBody(compressedBody).
 		SetHeader("Content-Type", "application/json").
+		SetHeader("Content-Encoding", "gzip").
 		Post(addr)
 
 	if err != nil {
@@ -44,4 +54,25 @@ func (f *MetricUpdateFacade) Update(ctx context.Context, req types.Metrics) erro
 	}
 
 	return nil
+}
+
+func compressBody(data types.Metrics) ([]byte, error) {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+
+	var buf bytes.Buffer
+	gzw := gzip.NewWriter(&buf)
+
+	_, err = gzw.Write(jsonData)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := gzw.Close(); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
 }
