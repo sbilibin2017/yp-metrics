@@ -4,11 +4,15 @@ import (
 	"context"
 	"flag"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/go-resty/resty/v2"
+	"github.com/jmoiron/sqlx"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -227,6 +231,52 @@ func (s *MainSuite) TestUpdateMetric() {
 			s.Equal(tt.expectedStatus, resp.StatusCode())
 		})
 	}
+}
+
+func TestPingHandler_Success(t *testing.T) {
+	mockDB, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
+	assert.NoError(t, err)
+	defer mockDB.Close()
+
+	db := sqlx.NewDb(mockDB, "pgx")
+
+	mock.ExpectPing()
+
+	handler := pingHandler(db)
+
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	req = req.WithContext(context.Background())
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func TestPingHandler_DBError(t *testing.T) {
+	mockDB, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
+	assert.NoError(t, err)
+	defer mockDB.Close()
+
+	db := sqlx.NewDb(mockDB, "pgx")
+
+	mock.ExpectPing().WillReturnError(context.DeadlineExceeded)
+
+	handler := pingHandler(db)
+
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	req = req.WithContext(context.Background())
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
 }
 
 func (s *MainSuite) TestGetMetricValue() {
