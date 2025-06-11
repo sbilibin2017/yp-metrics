@@ -25,11 +25,14 @@ func NewMetricAgentWorker(
 	metricsUpdater MetricsUpdater,
 	pollInterval int,
 	reportInterval int,
-) func(ctx context.Context) {
-	return func(ctx context.Context) {
+) func(ctx context.Context) error {
+	return func(ctx context.Context) error {
 		pollMetricsCh := pollMetrics(
 			ctx,
-			[]func() []types.MetricsUpdatePathRequest{collectRuntimeCounterMetrics, collectRuntimeGaugeMetrics},
+			[]func() []types.MetricsUpdatePathRequest{
+				collectRuntimeCounterMetrics,
+				collectRuntimeGaugeMetrics,
+			},
 			pollInterval,
 		)
 		reportMetricsCh := reportMetrics(
@@ -39,6 +42,7 @@ func NewMetricAgentWorker(
 			pollMetricsCh,
 		)
 		logResults(ctx, reportMetricsCh)
+		return nil
 	}
 }
 
@@ -218,21 +222,19 @@ func reportMetrics(
 }
 
 func logResults(ctx context.Context, results <-chan metricsUpdateResult) {
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case res, ok := <-results:
+			if !ok {
 				return
-			case res, ok := <-results:
-				if !ok {
-					return
-				}
-				if res.Err != nil {
-					logger.Log.Errorf("Failed to update metric %s (%s): %v", res.Request.ID, res.Request.MType, res.Err)
-				} else {
-					logger.Log.Infof("Successfully updated metric %s (%s): %s", res.Request.ID, res.Request.MType, res.Request.Value)
-				}
+			}
+			if res.Err != nil {
+				logger.Log.Errorf("Failed to update metric %s (%s): %v", res.Request.ID, res.Request.MType, res.Err)
+			} else {
+				logger.Log.Infof("Successfully updated metric %s (%s): %s", res.Request.ID, res.Request.MType, res.Request.Value)
 			}
 		}
-	}()
+	}
 }

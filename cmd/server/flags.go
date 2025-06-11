@@ -10,21 +10,19 @@ import (
 func parseFlags() (*configs.ServerConfig, error) {
 	fs := flag.NewFlagSet("server", flag.ContinueOnError)
 
-	var addr string
-	fs.StringVar(&addr, "a", ":8080", "address and port to run server")
+	addr := fs.String("a", ":8080", "address and port to run server")
 
 	err := fs.Parse(os.Args[1:])
-
 	if err != nil {
 		return nil, err
 	}
 
-	if envRunAddr := os.Getenv("RUN_ADDR"); envRunAddr != "" {
-		addr = envRunAddr
+	if envAddr := os.Getenv("ADDRESS"); envAddr != "" {
+		*addr = envAddr
 	}
 
 	return configs.NewServerConfig(
-		configs.WithServerRunAddress(addr),
+		configs.WithServerRunAddress(*addr),
 		configs.WithServerLogLevel(),
 	), nil
 }

@@ -142,6 +142,7 @@
 | iter2    | Реализация агента сбора метрик                         | https://github.com/sbilibin2017/yp-metrics/pull/2|
 | iter3    | Добавление к серверу обработчиков дял поулчения метрик | https://github.com/sbilibin2017/yp-metrics/pull/3|
 | iter4    | Добавление флагов для конфигурирования серва и агнта   | https://github.com/sbilibin2017/yp-metrics/pull/4|
+| iter5    | Добавление приоритета конфигураций (env>flag>default)  | https://github.com/sbilibin2017/yp-metrics/pull/5|
 
 ---
 
