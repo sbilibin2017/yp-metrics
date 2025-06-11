@@ -65,13 +65,3 @@ func TestWithMultipleAgentOptions(t *testing.T) {
 	assert.Equal(t, 15, cfg.PollInterval)
 	assert.Equal(t, 30, cfg.ReportInterval)
 }
-
-func TestWithAgentServerEndpoint(t *testing.T) {
-	cfg := NewAgentConfig(WithAgentServerEndpoint())
-
-	assert.Equal(t, "/update", cfg.ServerEndpoint)
-	assert.Empty(t, cfg.LogLevel)
-	assert.Empty(t, cfg.ServerRunAddress)
-	assert.Empty(t, cfg.PollInterval)
-	assert.Empty(t, cfg.ReportInterval)
-}

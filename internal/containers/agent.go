@@ -21,7 +21,6 @@ func NewAgentContainer(config *configs.AgentConfig) (*AgentContainer, error) {
 	metricUpdateFacade := facades.NewMetricUpdateFacade(
 		client,
 		config.ServerRunAddress,
-		config.ServerEndpoint,
 	)
 
 	worker := workers.NewMetricAgentWorker(

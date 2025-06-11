@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/golang/mock/gomock"
 	"github.com/sbilibin2017/yp-metrics/internal/types"
+	"github.com/sbilibin2017/yp-metrics/internal/validators"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -35,12 +36,17 @@ func TestMetricGetPathHandler(t *testing.T) {
 		return req
 	}
 
+	alwaysValidValidator := func(metricType, metricName string) error {
+		return nil
+	}
+
 	tests := []struct {
 		name           string
 		url            string
 		mockGetter     func()
 		wantStatusCode int
 		wantBody       string
+		validator      func(string, string) error
 	}{
 		{
 			name: "valid gauge metric",
@@ -53,6 +59,7 @@ func TestMetricGetPathHandler(t *testing.T) {
 			},
 			wantStatusCode: http.StatusOK,
 			wantBody:       "42.5",
+			validator:      alwaysValidValidator,
 		},
 		{
 			name: "valid counter metric",
@@ -65,6 +72,7 @@ func TestMetricGetPathHandler(t *testing.T) {
 			},
 			wantStatusCode: http.StatusOK,
 			wantBody:       "100",
+			validator:      alwaysValidValidator,
 		},
 		{
 			name: "metric not found",
@@ -76,6 +84,7 @@ func TestMetricGetPathHandler(t *testing.T) {
 			},
 			wantStatusCode: http.StatusNotFound,
 			wantBody:       types.ErrMetricNotFound.Error() + "\n",
+			validator:      alwaysValidValidator,
 		},
 		{
 			name: "internal service error",
@@ -87,27 +96,35 @@ func TestMetricGetPathHandler(t *testing.T) {
 			},
 			wantStatusCode: http.StatusInternalServerError,
 			wantBody:       types.ErrInternalServerError.Error() + "\n",
+			validator:      alwaysValidValidator,
 		},
 		{
 			name:           "invalid type",
 			url:            "/value/invalidtype/load",
 			mockGetter:     func() {}, // no call expected
 			wantStatusCode: http.StatusBadRequest,
-			wantBody:       types.ErrInvalidMetricType.Error() + "\n",
+			wantBody:       validators.ErrInvalidMetricType.Error() + "\n",
+			validator: func(metricType, metricName string) error {
+				return validators.ErrInvalidMetricType
+			},
 		},
 		{
 			name:           "missing name",
 			url:            "/value/gauge/",
 			mockGetter:     func() {}, // no call expected
 			wantStatusCode: http.StatusNotFound,
-			wantBody:       types.ErrNameIsRequired.Error() + "\n",
+			wantBody:       validators.ErrNameIsRequired.Error() + "\n",
+			validator: func(metricType, metricName string) error {
+				return validators.ErrNameIsRequired
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.mockGetter()
-			handler := MetricGetPathHandler(mockGetter)
+
+			handler := MetricGetPathHandler(tt.validator, mockGetter)
 
 			req := makeRequest("GET", tt.url)
 			rec := httptest.NewRecorder()

@@ -1,197 +1,138 @@
-package types
+package types_test
 
 import (
-	"strings"
 	"testing"
 
+	"github.com/sbilibin2017/yp-metrics/internal/types"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewMetrics(t *testing.T) {
-	float64Ptr := func(f float64) *float64 { return &f }
-	int64Ptr := func(i int64) *int64 { return &i }
+	gauge := types.NewMetrics(types.Gauge, "testGauge", "12.34")
+	assert.Equal(t, "testGauge", gauge.ID)
+	assert.Equal(t, types.Gauge, gauge.MType)
+	assert.NotNil(t, gauge.Value)
+	assert.Nil(t, gauge.Delta)
+	assert.Equal(t, 12.34, *gauge.Value)
 
-	tests := []struct {
-		name        string
-		metricType  string
-		metricName  string
-		metricValue string
-		expected    *Metrics
-		expectedErr error
-	}{
-		{
-			name:        "valid gauge",
-			metricType:  Gauge,
-			metricName:  "temperature",
-			metricValue: "42.42",
-			expected: &Metrics{
-				ID:    "temperature",
-				MType: Gauge,
-				Value: float64Ptr(42.42),
-			},
-			expectedErr: nil,
-		},
-		{
-			name:        "valid counter",
-			metricType:  Counter,
-			metricName:  "requests",
-			metricValue: "10",
-			expected: &Metrics{
-				ID:    "requests",
-				MType: Counter,
-				Delta: int64Ptr(10),
-			},
-			expectedErr: nil,
-		},
-		{
-			name:        "missing name",
-			metricType:  Gauge,
-			metricName:  "",
-			metricValue: "10.0",
-			expected:    nil,
-			expectedErr: ErrNameIsRequired,
-		},
-		{
-			name:        "missing type",
-			metricType:  "",
-			metricName:  "test",
-			metricValue: "10.0",
-			expected:    nil,
-			expectedErr: ErrTypeIsRequired,
-		},
-		{
-			name:        "invalid type",
-			metricType:  "foo",
-			metricName:  "test",
-			metricValue: "10.0",
-			expected:    nil,
-			expectedErr: ErrInvalidMetricType,
-		},
-		{
-			name:        "missing value",
-			metricType:  Gauge,
-			metricName:  "test",
-			metricValue: "",
-			expected:    nil,
-			expectedErr: ErrValueIsRequired,
-		},
-		{
-			name:        "invalid gauge value",
-			metricType:  Gauge,
-			metricName:  "test",
-			metricValue: "abc",
-			expected:    nil,
-			expectedErr: ErrInvalidGaugeValue,
-		},
-		{
-			name:        "invalid counter value",
-			metricType:  Counter,
-			metricName:  "test",
-			metricValue: "abc",
-			expected:    nil,
-			expectedErr: ErrInvalidCounterValue,
-		},
-	}
+	counter := types.NewMetrics(types.Counter, "testCounter", "42")
+	assert.Equal(t, "testCounter", counter.ID)
+	assert.Equal(t, types.Counter, counter.MType)
+	assert.NotNil(t, counter.Delta)
+	assert.Nil(t, counter.Value)
+	assert.Equal(t, int64(42), *counter.Delta)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := NewMetrics(tt.metricType, tt.metricName, tt.metricValue)
+	// If metricValue invalid, NewMetrics returns zero value (no error handling here)
+	invalidGauge := types.NewMetrics(types.Gauge, "badGauge", "abc")
+	assert.NotNil(t, invalidGauge)
+	assert.Nil(t, invalidGauge.Value) // parsing failed
 
-			if tt.expectedErr == nil {
-				assert.NoError(t, err)
-				assert.NotNil(t, result)
-				assert.Equal(t, tt.expected.ID, result.ID)
-				assert.Equal(t, tt.expected.MType, result.MType)
-				if tt.expected.MType == Gauge {
-					assert.NotNil(t, result.Value)
-					assert.InDelta(t, *tt.expected.Value, *result.Value, 0.0001)
-				}
-				if tt.expected.MType == Counter {
-					assert.NotNil(t, result.Delta)
-					assert.Equal(t, *tt.expected.Delta, *result.Delta)
-				}
-			} else {
-				assert.ErrorIs(t, err, tt.expectedErr)
-				assert.Nil(t, result)
-			}
-		})
-	}
+	invalidCounter := types.NewMetrics(types.Counter, "badCounter", "abc")
+	assert.NotNil(t, invalidCounter)
+	assert.Nil(t, invalidCounter.Delta) // parsing failed
 }
 
 func TestNewMetricID(t *testing.T) {
-	tests := []struct {
-		name      string
-		mType     string
-		id        string
-		wantID    *MetricID
-		wantError error
-	}{
-		{"valid gauge", Gauge, "load", &MetricID{ID: "load", MType: Gauge}, nil},
-		{"valid counter", Counter, "hits", &MetricID{ID: "hits", MType: Counter}, nil},
-		{"empty id", Gauge, "", nil, ErrNameIsRequired},
-		{"empty type", "", "load", nil, ErrTypeIsRequired},
-		{"invalid type", "invalid", "load", nil, ErrInvalidMetricType},
-	}
+	mType := "gauge"
+	id := "metric1"
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewMetricID(tt.mType, tt.id)
-			if tt.wantError != nil {
-				assert.ErrorIs(t, err, tt.wantError)
-				assert.Nil(t, got)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.wantID, got)
-			}
-		})
-	}
+	metricID := types.NewMetricID(mType, id)
+
+	assert.NotNil(t, metricID)
+	assert.Equal(t, mType, metricID.MType)
+	assert.Equal(t, id, metricID.ID)
 }
 
 func TestGetMetricValueString(t *testing.T) {
-	gVal := 12.34
-	cVal := int64(42)
+	gaugeVal := 3.14
+	counterVal := int64(10)
 
 	tests := []struct {
-		name      string
-		metric    Metrics
-		wantValue string
-		wantErr   error
+		name    string
+		metric  types.Metrics
+		want    string
+		wantErr error
 	}{
-		{"valid gauge", Metrics{MType: Gauge, Value: &gVal}, "12.34", nil},
-		{"valid counter", Metrics{MType: Counter, Delta: &cVal}, "42", nil},
-		{"nil gauge value", Metrics{MType: Gauge}, "", ErrNilMetricValue},
-		{"nil counter delta", Metrics{MType: Counter}, "", ErrNilMetricValue},
-		{"unknown type", Metrics{MType: "unknown"}, "", ErrUnknownMType},
+		{
+			name: "valid gauge",
+			metric: types.Metrics{
+				MType: types.Gauge,
+				Value: &gaugeVal,
+			},
+			want:    "3.14",
+			wantErr: nil,
+		},
+		{
+			name: "nil gauge value",
+			metric: types.Metrics{
+				MType: types.Gauge,
+				Value: nil,
+			},
+			want:    "",
+			wantErr: types.ErrNilMetricValue,
+		},
+		{
+			name: "valid counter",
+			metric: types.Metrics{
+				MType: types.Counter,
+				Delta: &counterVal,
+			},
+			want:    "10",
+			wantErr: nil,
+		},
+		{
+			name: "nil counter value",
+			metric: types.Metrics{
+				MType: types.Counter,
+				Delta: nil,
+			},
+			want:    "",
+			wantErr: types.ErrNilMetricValue,
+		},
+		{
+			name: "unknown type",
+			metric: types.Metrics{
+				MType: "unknown",
+			},
+			want:    "",
+			wantErr: types.ErrUnknownMType,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetMetricValueString(tt.metric)
-			if tt.wantErr != nil {
-				assert.ErrorIs(t, err, tt.wantErr)
-				assert.Empty(t, got)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.wantValue, got)
-			}
+			got, err := types.GetMetricValueString(tt.metric)
+			assert.Equal(t, tt.wantErr, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
 
 func TestGetMetricsHTML(t *testing.T) {
-	gVal := 5.5
-	cVal := int64(10)
+	gaugeVal := 1.23
+	counterVal := int64(5)
 
-	metrics := []Metrics{
-		{ID: "load", MType: Gauge, Value: &gVal},
-		{ID: "hits", MType: Counter, Delta: &cVal},
-		{ID: "bad", MType: Gauge},
+	metrics := []types.Metrics{
+		{
+			ID:    "metric1",
+			MType: types.Gauge,
+			Value: &gaugeVal,
+		},
+		{
+			ID:    "metric2",
+			MType: types.Counter,
+			Delta: &counterVal,
+		},
+		{
+			ID:    "metric3",
+			MType: types.Gauge,
+			Value: nil, // should be skipped
+		},
 	}
 
-	html, err := GetMetricsHTML(metrics)
+	html, err := types.GetMetricsHTML(metrics)
 	assert.NoError(t, err)
-	assert.True(t, strings.HasPrefix(html, "<!DOCTYPE html>"))
-	assert.Contains(t, html, "load (gauge): 5.5")
-	assert.Contains(t, html, "hits (counter): 10")
-	assert.NotContains(t, html, "bad")
+	assert.Contains(t, html, "<li>metric1 (gauge): 1.23</li>")
+	assert.Contains(t, html, "<li>metric2 (counter): 5</li>")
+	assert.NotContains(t, html, "metric3") // nil value skipped
 }

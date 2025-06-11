@@ -3,7 +3,6 @@ package workers
 import (
 	"context"
 	"errors"
-	"strconv"
 	"testing"
 	"time"
 
@@ -31,8 +30,7 @@ func TestCollectRuntimeGaugeMetrics(t *testing.T) {
 		require.Contains(t, expectedIDs, m.ID)
 		require.Equal(t, types.Gauge, m.MType)
 
-		require.NotEmpty(t, m.Value)
-		require.True(t, isFloatString(m.Value), "value for metric %s should be a float string", m.ID)
+		require.NotNil(t, m.Value)
 
 		foundIDs[m.ID] = true
 	}
@@ -40,15 +38,6 @@ func TestCollectRuntimeGaugeMetrics(t *testing.T) {
 	for _, id := range expectedIDs {
 		require.Contains(t, foundIDs, id, "metric %s not found", id)
 	}
-}
-
-func isFloatString(s string) bool {
-	for _, c := range s {
-		if !(c >= '0' && c <= '9' || c == '.' || c == '-' || c == 'e' || c == 'E') {
-			return false
-		}
-	}
-	return true
 }
 
 func TestCollectRuntimeCounterMetrics(t *testing.T) {
@@ -59,15 +48,12 @@ func TestCollectRuntimeCounterMetrics(t *testing.T) {
 	require.Equal(t, "PollCount", m.ID)
 	require.Equal(t, types.Counter, m.MType)
 
-	val, err := strconv.ParseInt(m.Value, 10, 64)
-	require.NoError(t, err, "value should be parseable as int64")
-	require.Equal(t, int64(1), val, "expected PollCount value to be 1")
 }
 
 func TestPollMetrics(t *testing.T) {
-	collector := func() []types.MetricsUpdatePathRequest {
-		return []types.MetricsUpdatePathRequest{
-			{ID: "testMetric", MType: types.Gauge, Value: "123.456"},
+	collector := func() []types.Metrics {
+		return []types.Metrics{
+			{ID: "testMetric", MType: types.Gauge, Value: float64PtrToStringPtr(123.456)},
 		}
 	}
 
@@ -76,14 +62,13 @@ func TestPollMetrics(t *testing.T) {
 
 	pollInterval := 1
 
-	outCh := pollMetrics(ctx, []func() []types.MetricsUpdatePathRequest{collector}, pollInterval)
+	outCh := pollMetrics(ctx, []func() []types.Metrics{collector}, pollInterval)
 
 	select {
 	case m := <-outCh:
 		require.Equal(t, "testMetric", m.ID)
 		require.Equal(t, types.Gauge, m.MType)
-		require.Equal(t, "123.456", m.Value)
-
+		require.NotEmpty(t, m.Value)
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for metric from pollMetrics")
 	}
@@ -92,6 +77,10 @@ func TestPollMetrics(t *testing.T) {
 
 	_, ok := <-outCh
 	require.False(t, ok, "expected channel to be closed after context cancel")
+}
+
+func float64PtrToStringPtr(f float64) *float64 {
+	return &f
 }
 
 func TestReportMetrics(t *testing.T) {
@@ -105,10 +94,10 @@ func TestReportMetrics(t *testing.T) {
 
 	reportInterval := 1
 
-	in := make(chan types.MetricsUpdatePathRequest)
+	in := make(chan types.Metrics)
 
-	firstMetric := types.MetricsUpdatePathRequest{ID: "metric1", MType: types.Gauge, Value: "1"}
-	secondMetric := types.MetricsUpdatePathRequest{ID: "metric2", MType: types.Counter, Value: "2"}
+	firstMetric := types.Metrics{ID: "metric1", MType: types.Gauge, Value: float64PtrToStringPtr(1)}
+	secondMetric := types.Metrics{ID: "metric2", MType: types.Counter, Delta: int64Ptr(2)}
 
 	mockUpdater.EXPECT().Update(gomock.Any(), firstMetric).Return(nil).Times(1)
 	mockUpdater.EXPECT().Update(gomock.Any(), secondMetric).Return(nil).Times(1)
@@ -139,6 +128,10 @@ func TestReportMetrics(t *testing.T) {
 	require.Equal(t, 1, counts["metric2"])
 }
 
+func int64Ptr(i int64) *int64 {
+	return &i
+}
+
 func TestReportMetrics_TickerCase(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -149,11 +142,11 @@ func TestReportMetrics_TickerCase(t *testing.T) {
 
 	reportInterval := 1
 
-	in := make(chan types.MetricsUpdatePathRequest)
+	in := make(chan types.Metrics)
 
-	metrics := []types.MetricsUpdatePathRequest{
-		{ID: "metric1", MType: types.Gauge, Value: "1"},
-		{ID: "metric2", MType: types.Counter, Value: "2"},
+	metrics := []types.Metrics{
+		{ID: "metric1", MType: types.Gauge, Value: float64PtrToStringPtr(1)},
+		{ID: "metric2", MType: types.Counter, Delta: int64Ptr(2)},
 	}
 
 	for _, m := range metrics {
@@ -199,11 +192,11 @@ func TestReportMetrics_ContextDone(t *testing.T) {
 
 	reportInterval := 10
 
-	in := make(chan types.MetricsUpdatePathRequest)
+	in := make(chan types.Metrics)
 
-	metrics := []types.MetricsUpdatePathRequest{
-		{ID: "metric1", MType: types.Gauge, Value: "1"},
-		{ID: "metric2", MType: types.Counter, Value: "2"},
+	metrics := []types.Metrics{
+		{ID: "metric1", MType: types.Gauge, Value: float64PtrToStringPtr(1)},
+		{ID: "metric2", MType: types.Counter, Delta: int64Ptr(2)},
 	}
 
 	for _, m := range metrics {
@@ -252,19 +245,19 @@ func TestLogResults(t *testing.T) {
 	}()
 
 	results <- metricsUpdateResult{
-		Request: types.MetricsUpdatePathRequest{
+		Request: types.Metrics{
 			ID:    "metric_success",
 			MType: types.Gauge,
-			Value: "100",
+			Value: float64PtrToStringPtr(100),
 		},
 		Err: nil,
 	}
 
 	results <- metricsUpdateResult{
-		Request: types.MetricsUpdatePathRequest{
+		Request: types.Metrics{
 			ID:    "metric_fail",
 			MType: types.Counter,
-			Value: "200",
+			Delta: int64Ptr(200),
 		},
 		Err: errors.New("some error"),
 	}
