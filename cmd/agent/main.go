@@ -27,7 +27,10 @@ var (
 	address        string
 	pollInterval   int
 	reportInterval int
-	logLevel       string = "info"
+)
+
+var (
+	logLevel string = "info"
 )
 
 func parseFlags() {

@@ -48,90 +48,110 @@
 
 ```
 .
-├── cmd
-│   ├── agent                         # Агент — клиентский компонент сбора и отправки метрик
-│   │   ├── agent                    # (исполняемый файл или бинарник агента)
-│   │   ├── flags.go                 # Определение и обработка CLI-флагов агента
-│   │   ├── flags_test.go            # Тесты для флагов агента
-│   │   ├── main.go                  # Основной файл запуска агента (точка входа)
-│   │   ├── main_test.go             # Тесты для main.go агента
-│   │   └── run.go                   # Логика запуска и жизненного цикла агента
-│   └── server                       # Сервер — приёмник метрик и API
-│       ├── flags.go                 # Определение и обработка CLI-флагов сервера
-│       ├── flags_test.go            # Тесты для флагов сервера
-│       ├── main.go                  # Основной файл запуска сервера (точка входа)
-│       ├── main_test.go             # Тесты для main.go сервера
-│       ├── run.go                   # Логика запуска и жизненного цикла сервера
-│       └── server                  # (исполняемый файл или бинарник сервера)
-├── go.mod                           # Описание зависимостей Go-модуля
-├── go.sum                           # Контрольные суммы зависимостей
-├── internal                         # Внутренние пакеты (неэкспортируемые за пределы модуля)
-│   ├── configs                      # Конфигурации приложения (агента и сервера)
-│   │   ├── agent.go                 # Конфигурация агента
-│   │   ├── agent_test.go            # Тесты конфигурации агента
-│   │   ├── server.go                # Конфигурация сервера
-│   │   └── server_test.go           # Тесты конфигурации сервера
-│   ├── containers                   # Контейнеры и DI-компоненты для агента и сервера
-│   │   ├── agent.go                 # DI-контейнер агента
-│   │   ├── agent_test.go            # Тесты DI-контейнера агента
-│   │   ├── server.go                # DI-контейнер сервера
-│   │   └── server_test.go           # Тесты DI-контейнера сервера
-│   ├── facades                     # Фасады — обёртки над внешними компонентами/зависимостями
-│   │   ├── metric_update.go         # Фасад отправки метрик от агента на сервер
-│   │   └── metric_update_test.go    # Тесты фасада отправки метрик
-│   ├── handlers                    # HTTP-обработчики входящих запросов
-│   │   ├── metric_get_path.go       # Обработчик получения метрик по URL пути
-│   │   ├── metric_get_path_mock.go  # Моки для тестов обработчика получения
-│   │   ├── metric_get_path_test.go  # Тесты обработчика получения метрик
-│   │   ├── metric_get_body.go       # Обработчик получения метрик в теле
-│   │   ├── metric_get_body_mock.go  # Моки для тестов обработчика получения
-│   │   ├── metric_get_body_test.go  # Тесты обработчика получения метрик
-│   │   ├── metric_list.go           # Обработчик списка метрик (HTML)
-│   │   ├── metric_list_mock.go      # Моки для тестов списка метрик
-│   │   ├── metric_list_test.go      # Тесты списка метрик
-│   │   ├── metric_update_path.go    # Обработчик обновления метрик по URL пути
-│   │   ├── metric_update_path_mock.go # Моки для тестов обновления
-│   │   └── metric_update_path_test.go # Тесты обновления метрик
-│   │   ├── metric_update_body.go    # Обработчик обновления метрик в теле
-│   │   ├── metric_update_body_mock.go # Моки для тестов обновления
-│   │   └── metric_update_body_test.go # Тесты обновления метрик
-│   ├── logger                     # Подсистема логирования
-│   │   ├── logger.go                # Инициализация и настройка логгера
-│   │   └── logger_test.go           # Тесты подсистемы логирования
-│   ├── middlewares                # Middlewares
-│   │   ├── logging.go               # Логирование запросов и ответов сервера
-│   │   └── logging_test.go          # Тесты логирование запросов и ответов сервера
-│   │   ├── gzip.go                  # Сжатие и разжатие запросов и ответов сервера
-│   │   └── gzip_test.go             # Тесты сжатия и разжатия запросов и ответов сервера
-│   ├── repositories               # Репозитории — хранение и извлечение метрик
-│   │   ├── metric_memory_get.go     # Получение метрик из памяти
-│   │   ├── metric_memory_get_test.go# Тесты получения метрик из памяти
-│   │   ├── metric_memory_list.go    # Получение списка метрик из памяти
-│   │   ├── metric_memory_list_test.go # Тесты списка метрик
-│   │   ├── metric_memory_save.go    # Сохранение метрик в память
-│   │   └── metric_memory_save_test.go # Тесты сохранения метрик
-│   ├── services                 # Бизнес-логика работы с метриками
-│   │   ├── metric_get.go           # Логика получения метрик
-│   │   ├── metric_get_mock.go      # Моки для сервиса получения
-│   │   ├── metric_get_test.go      # Тесты сервиса получения метрик
-│   │   ├── metric_list.go          # Логика формирования списка метрик
-│   │   ├── metric_list_mock.go     # Моки для сервиса списка
-│   │   ├── metric_list_test.go     # Тесты сервиса списка метрик
-│   │   ├── metric_update.go        # Логика обновления метрик
-│   │   ├── metric_update_mock.go   # Моки для сервиса обновления
-│   │   └── metric_update_test.go   # Тесты обновления метрик
-│   ├── types                   # Общие типы и структуры данных
-│   │   ├── metrics.go              # Определения типов метрик
-│   │   └── metrics_test.go         # Тесты типов метрик
-│   └── workers                 # Воркеры — циклы сбора и отправки метрик
-│       ├── metric_agent.go         # Воркер агента (сбор и отправка метрик)
-│       ├── metric_agent_mock.go    # Моки для воркера агента
-│       └── metric_agent_test.go    # Тесты воркера агента
-|       ├── metric_server.go        # Воркер сервера (сбор и отправка метрик)
-│       ├── metric_server_mock.go   # Моки для воркера сервера
-│       └── metric_server_test.go   # Тесты воркера сервера
-├── Makefile                      # Скрипты для сборки, тестирования и запуска
-└── README.md                     # Документация проекта
+├── cmd                                # Точка входа в приложение (agent и server)
+│   ├── agent                          # Каталог с исходниками агента
+│   │   ├── agent                      # Логика агента (сбор метрик, отправка)
+│   │   ├── main.go                    # Главный файл запуска агента
+│   │   └── main_test.go              # Тесты для запуска агента
+│   └── server                         # Каталог с исходниками сервера
+│       ├── main.go                    # Главный файл запуска сервера
+│       ├── main_test.go              # Тесты для запуска сервера
+│       └── server                    # Логика запуска HTTP-сервера (может быть роутинг, инициализация)
+├── data
+│   └── metrics.json                   # JSON-файл для хранения метрик при использовании файлового стора
+├── go.mod                             # Go-модуль (описание зависимостей)
+├── go.sum                             # Контрольные суммы для зависимостей
+├── internal                           # Внутренние пакеты (не экспортируются за пределы модуля)
+│   ├── contexts
+│   │   ├── tx.go                      # Контекст для работы с транзакциями
+│   │   └── tx_test.go                # Тесты для контекста транзакций
+│   ├── facades
+│   │   ├── metric_update.go          # Фасад (обертка) для обновления метрик
+│   │   └── metric_update_test.go     # Тесты фасада обновления метрик
+│   ├── handlers                       # HTTP-обработчики
+│   │   ├── metric_get_body.go        # POST /value/ - получение метрик по JSON
+│   │   ├── metric_get_body_mock.go   # Моки для тестов metric_get_body
+│   │   ├── metric_get_body_test.go   # Тесты для metric_get_body
+│   │   ├── metric_get_path.go        # GET /value/{type}/{name} - получение метрик по пути
+│   │   ├── metric_get_path_mock.go   # Моки для metric_get_path
+│   │   ├── metric_get_path_test.go   # Тесты для metric_get_path
+│   │   ├── metric_list.go            # GET / - HTML-список всех метрик
+│   │   ├── metric_list_mock.go       # Моки для списка метрик
+│   │   ├── metric_list_test.go       # Тесты списка метрик
+│   │   ├── metric_update_body.go     # POST /update/ - обновление метрики по JSON
+│   │   ├── metric_update_body_mock.go# Моки для metric_update_body
+│   │   ├── metric_update_body_test.go# Тесты для metric_update_body
+│   │   ├── metric_update_path.go     # POST /update/{type}/{name}/{value} - обновление по пути
+│   │   ├── metric_update_path_mock.go# Моки для metric_update_path
+│   │   └── metric_update_path_test.go# Тесты для metric_update_path
+│   ├── logger
+│   │   ├── logger.go                 # Настройка логгера (уровень, формат и т.п.)
+│   │   └── logger_test.go           # Тесты логгера
+│   ├── middlewares
+│   │   ├── gzip.go                  # Middleware для сжатия/распаковки gzip
+│   │   ├── gzip_test.go            # Тесты gzip middleware
+│   │   ├── logging.go              # Middleware логирования HTTP-запросов
+│   │   ├── logging_test.go         # Тесты логирования
+│   │   ├── tx.go                   # Middleware для управления транзакциями
+│   │   └── tx_test.go              # Тесты транзакционного middleware
+│   ├── repositories                 # Реализация хранилищ метрик (память, файл, БД)
+│   │   ├── db_helpers.go           # Вспомогательные функции для работы с БД
+│   │   ├── db_helpers_test.go      # Тесты для db_helpers
+│   │   ├── metric_db_get.go        # Получение метрик из БД
+│   │   ├── metric_db_get_test.go   # Тесты metric_db_get
+│   │   ├── metric_db_list.go       # Получение списка метрик из БД
+│   │   ├── metric_db_list_test.go  # Тесты metric_db_list
+│   │   ├── metric_db_save.go       # Сохранение метрик в БД
+│   │   ├── metric_db_save_test.go  # Тесты metric_db_save
+│   │   ├── metric_file_get.go      # Получение метрик из файла
+│   │   ├── metric_file_get_test.go # Тесты metric_file_get
+│   │   ├── metric_file_list.go     # Список метрик из файла
+│   │   ├── metric_file_list_test.go# Тесты metric_file_list
+│   │   ├── metric_file_save.go     # Сохранение метрик в файл
+│   │   ├── metric_file_save_test.go# Тесты metric_file_save
+│   │   ├── metric_get.go           # Общее получение метрик (интерфейсы)
+│   │   ├── metric_get_mock.go      # Моки
+│   │   ├── metric_get_test.go      # Тесты
+│   │   ├── metric_list.go          # Получение списка метрик
+│   │   ├── metric_list_mock.go     # Моки
+│   │   ├── metric_list_test.go     # Тесты
+│   │   ├── metric_memory_get.go    # Получение из памяти
+│   │   ├── metric_memory_get_test.go# Тесты
+│   │   ├── metric_memory_list.go   # Список из памяти
+│   │   ├── metric_memory_list_test.go# Тесты
+│   │   ├── metric_memory_save.go   # Сохранение в память
+│   │   ├── metric_memory_save_test.go# Тесты
+│   │   ├── metric_save.go          # Универсальный интерфейс сохранения
+│   │   ├── metric_save_mock.go     # Моки
+│   │   └── metric_save_test.go     # Тесты
+│   ├── services
+│   │   ├── metric_get.go           # Сервис получения метрик (агрегация логики)
+│   │   ├── metric_get_mock.go      # Моки
+│   │   ├── metric_get_test.go      # Тесты
+│   │   ├── metric_list.go          # Сервис списка метрик
+│   │   ├── metric_list_mock.go     # Моки
+│   │   ├── metric_list_test.go     # Тесты
+│   │   ├── metric_update.go        # Сервис обновления метрик
+│   │   ├── metric_update_mock.go   # Моки
+│   │   └── metric_update_test.go   # Тесты
+│   ├── types
+│   │   ├── metrics.go              # Описание структур метрик
+│   │   └── metrics_test.go         # Тесты для структур
+│   ├── validators
+│   │   ├── metric.go               # Валидация метрик (тип, имя, значение)
+│   │   └── metric_test.go          # Тесты валидатора
+│   └── workers
+│       ├── metric_agent.go         # Работа агентской стороны (сбор метрик)
+│       ├── metric_agent_mock.go    # Моки
+│       ├── metric_agent_test.go    # Тесты
+│       ├── metric_server.go        # Обработка на стороне сервера
+│       ├── metric_server_mock.go   # Моки
+│       └── metric_server_test.go   # Тесты
+├── Makefile                         # Сценарии сборки и запуска
+├── migrations
+│   └── 20250612025220_create_metrics_table.sql # SQL-миграция для БД
+└── README.md                        # Документация по проекту
+                  # Документация проекта
 ```
 
 ---
@@ -144,6 +164,7 @@
 | Chi                     | HTTP роутер                         |
 | Resty                   | HTTP клиент                         |
 | Testify                 | Фреймворк для тестирования          |
+| Docker                  | Утилита для контейнеризации         |
 
 ---
 
@@ -152,7 +173,7 @@
 | Итерация | Описание                                               | Ссылка на PR                         |
 |----------|--------------------------------------------------------|------------------------------------|
 | iter1    | Реализация сервера сбора метрик с HTTP API             | https://github.com/sbilibin2017/yp-metrics/pull/1|
-| iter2    | Реализация агента сбора метрик                         | https://github.com/sbilibin2017/yp-metrics/pull/2|
+| iter2    | Реализация агента сбора метрик(использован паттерн фасад) | https://github.com/sbilibin2017/yp-metrics/pull/2|
 | iter3    | Добавление к серверу обработчиков дял поулчения метрик | https://github.com/sbilibin2017/yp-metrics/pull/3|
 | iter4    | Добавление флагов для конфигурирования серва и агнта   | https://github.com/sbilibin2017/yp-metrics/pull/4|
 | iter5    | Добавление приоритета конфигураций (env>flag>default)  | https://github.com/sbilibin2017/yp-metrics/pull/5|
@@ -160,6 +181,8 @@
 | iter7    | Добавление обновление и получение метрик в теле запроса | https://github.com/sbilibin2017/yp-metrics/pull/7|
 | iter8    | Добавление gzip middleware для зжатия/разжатия запросов/ответов | https://github.com/sbilibin2017/yp-metrics/pull/8|
 | iter9    | Добавление загрузки и сохранения метрик сервером из файла | https://github.com/sbilibin2017/yp-metrics/pull/9|
+| iter10    | Добавление подключения к бд (postgres) | https://github.com/sbilibin2017/yp-metrics/pull/10|
+| iter11    | Добавление работы сервера с бд и стратегий(использован паттерн стратегия) хранения метрик(бд>файл>память) | https://github.com/sbilibin2017/yp-metrics/pull/11|
 
 ---
 

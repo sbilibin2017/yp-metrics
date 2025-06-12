@@ -32,8 +32,7 @@ func MetricGetBodyHandler(
 			switch err {
 			case validators.ErrNameIsRequired:
 				http.Error(w, err.Error(), http.StatusNotFound)
-			case validators.ErrInvalidMetricType,
-				validators.ErrTypeIsRequired:
+			case validators.ErrInvalidMetricType, validators.ErrTypeIsRequired:
 				http.Error(w, err.Error(), http.StatusBadRequest)
 			default:
 				http.Error(w, types.ErrInternalServerError.Error(), http.StatusInternalServerError)
@@ -43,12 +42,18 @@ func MetricGetBodyHandler(
 
 		metric, err := svc.Get(r.Context(), metricID)
 		if err != nil {
-			http.Error(w, types.ErrInternalServerError.Error(), http.StatusInternalServerError)
-			return
+			switch err {
+			case types.ErrMetricNotFound:
+				http.Error(w, types.ErrMetricNotFound.Error(), http.StatusNotFound)
+				return
+			default:
+				http.Error(w, types.ErrInternalServerError.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
 
 		if metric == nil {
-			http.Error(w, types.ErrMetricNotFound.Error(), http.StatusNotFound)
+			http.Error(w, types.ErrInternalServerError.Error(), http.StatusInternalServerError)
 			return
 		}
 

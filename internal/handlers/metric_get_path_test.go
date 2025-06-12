@@ -80,7 +80,7 @@ func TestMetricGetPathHandler(t *testing.T) {
 			mockGetter: func() {
 				mockGetter.EXPECT().
 					Get(gomock.Any(), types.MetricID{ID: "unknown", MType: types.Gauge}).
-					Return(nil, nil)
+					Return(nil, types.ErrMetricNotFound)
 			},
 			wantStatusCode: http.StatusNotFound,
 			wantBody:       types.ErrMetricNotFound.Error() + "\n",

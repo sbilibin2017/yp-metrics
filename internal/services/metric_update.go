@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 
+	"github.com/sbilibin2017/yp-metrics/internal/logger"
 	"github.com/sbilibin2017/yp-metrics/internal/types"
 )
 
@@ -33,11 +34,21 @@ func (svc *MetricUpdateService) Update(
 	if metrics.MType == types.Counter {
 		currentMetric, err := svc.getter.Get(ctx, types.MetricID{ID: metrics.ID, MType: metrics.MType})
 		if err != nil {
+			logger.Log.Errorw("Failed to retrieve current metric", "id", metrics.ID, "error", err)
 			return types.ErrInternalServerError
 		}
+
 		if currentMetric != nil {
-			*metrics.Delta += *currentMetric.Delta
+			if currentMetric.Delta != nil {
+				*metrics.Delta += *currentMetric.Delta
+			}
 		}
 	}
-	return svc.saver.Save(ctx, metrics)
+
+	if err := svc.saver.Save(ctx, metrics); err != nil {
+		logger.Log.Errorw("Failed to save metric", "id", metrics.ID, "type", metrics.MType, "error", err)
+		return err
+	}
+
+	return nil
 }

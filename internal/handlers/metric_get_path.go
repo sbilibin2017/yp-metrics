@@ -37,18 +37,22 @@ func MetricGetPathHandler(
 		}
 
 		metricID := types.NewMetricID(metricType, metricName)
-
-		metric, err := svc.Get(r.Context(), *metricID)
-
-		if err != nil {
+		if metricID == nil {
 			http.Error(w, types.ErrInternalServerError.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		if metric == nil {
-			http.Error(w, types.ErrMetricNotFound.Error(), http.StatusNotFound)
-			return
+		metric, err := svc.Get(r.Context(), *metricID)
 
+		if err != nil {
+			switch err {
+			case types.ErrMetricNotFound:
+				http.Error(w, types.ErrMetricNotFound.Error(), http.StatusNotFound)
+				return
+			default:
+				http.Error(w, types.ErrInternalServerError.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
 
 		valueString, err := types.GetMetricValueString(*metric)
