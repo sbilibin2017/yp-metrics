@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMetricGetService_Get(t *testing.T) {
+func TestMetricGetService_Get_TableDriven(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -19,32 +19,60 @@ func TestMetricGetService_Get(t *testing.T) {
 	svc := NewMetricGetService(mockGetter)
 
 	ctx := context.Background()
-	metricID := types.MetricID{ID: "testMetric", MType: types.Gauge}
+
 	expectedMetric := &types.Metrics{
 		ID:    "testMetric",
 		MType: types.Gauge,
 		Value: func() *float64 { v := 123.45; return &v }(),
 	}
 
-	// Тест успешного вызова
-	mockGetter.EXPECT().
-		Get(ctx, metricID).
-		Return(expectedMetric, nil).
-		Times(1)
+	tests := []struct {
+		name         string
+		metricID     types.MetricID
+		returnMetric *types.Metrics
+		returnErr    error
+		expectedErr  error
+	}{
+		{
+			name:         "successful retrieval",
+			metricID:     types.MetricID{ID: "testMetric", MType: types.Gauge},
+			returnMetric: expectedMetric,
+			returnErr:    nil,
+			expectedErr:  nil,
+		},
+		{
+			name:         "getter returns error",
+			metricID:     types.MetricID{ID: "testMetric", MType: types.Gauge},
+			returnMetric: nil,
+			returnErr:    errors.New("some error"),
+			expectedErr:  types.ErrInternalServerError,
+		},
+		{
+			name:         "metric not found (nil metric, no error)",
+			metricID:     types.MetricID{ID: "missingMetric", MType: types.Gauge},
+			returnMetric: nil,
+			returnErr:    nil,
+			expectedErr:  types.ErrMetricNotFound,
+		},
+	}
 
-	result, err := svc.Get(ctx, metricID)
-	assert.NoError(t, err)
-	assert.Equal(t, expectedMetric, result)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockGetter.EXPECT().
+				Get(ctx, tt.metricID).
+				Return(tt.returnMetric, tt.returnErr).
+				Times(1)
 
-	// Тест случая ошибки
-	expectedErr := errors.New("not found")
-	mockGetter.EXPECT().
-		Get(ctx, metricID).
-		Return(nil, expectedErr).
-		Times(1)
+			result, err := svc.Get(ctx, tt.metricID)
 
-	result, err = svc.Get(ctx, metricID)
-	assert.Error(t, err)
-	assert.Nil(t, result)
-	assert.Equal(t, expectedErr, err)
+			if tt.expectedErr == nil {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.returnMetric, result)
+			} else {
+				assert.Error(t, err)
+				assert.Nil(t, result)
+				assert.Equal(t, tt.expectedErr, err)
+			}
+		})
+	}
 }

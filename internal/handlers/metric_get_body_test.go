@@ -131,7 +131,7 @@ func TestMetricGetBodyHandler(t *testing.T) {
 
 		mockSvc.EXPECT().
 			Get(gomock.Any(), metricID).
-			Return(nil, nil).
+			Return(nil, types.ErrMetricNotFound).
 			Times(1)
 
 		bodyBytes, _ := json.Marshal(metricID)

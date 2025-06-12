@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,6 +16,8 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 func resetFlags() {
@@ -139,17 +143,62 @@ func TestParseFlags_InvalidEnvValues(t *testing.T) {
 
 type MainSuite struct {
 	suite.Suite
-	cancel context.CancelFunc
-	client *resty.Client
+	cancel      context.CancelFunc
+	client      *resty.Client
+	pgContainer testcontainers.Container
+	db          *sqlx.DB
 }
 
 func (s *MainSuite) SetupSuite() {
+	ctx := context.Background()
+
+	req := testcontainers.ContainerRequest{
+		Image:        "postgres:15-alpine",
+		ExposedPorts: []string{"5432/tcp"},
+		Env: map[string]string{
+			"POSTGRES_USER":     "testuser",
+			"POSTGRES_PASSWORD": "testpass",
+			"POSTGRES_DB":       "testdb",
+		},
+		WaitingFor: wait.ForListeningPort("5432/tcp").
+			WithStartupTimeout(60 * time.Second),
+	}
+
+	pgC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+	s.Require().NoError(err)
+	s.pgContainer = pgC
+
+	host, err := pgC.Host(ctx)
+	s.Require().NoError(err)
+
+	port, err := pgC.MappedPort(ctx, "5432")
+	s.Require().NoError(err)
+
+	dsn := fmt.Sprintf("postgres://testuser:testpass@%s:%s/testdb?sslmode=disable", host, port.Port())
+
+	var db *sqlx.DB
+	for i := 0; i < 10; i++ {
+		db, err = sqlx.Connect("pgx", dsn)
+		if err == nil {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	s.Require().NoError(err)
+	s.db = db
+
+	// Set global DSN for your app if needed
+	databaseDSN = dsn
+
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 
-	// Set globals expected by run()
+	// Set your app globals here
 	addr = ":8080"
-	storeInterval = 1 // or your preferred test value
+	storeInterval = 1
 	fileStoragePath = "./testdata/metrics.json"
 	restore = false
 	logLevel = "info"
@@ -161,7 +210,7 @@ func (s *MainSuite) SetupSuite() {
 		}
 	}()
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 
 	s.client = resty.New().SetBaseURL("http://localhost:8080")
 }
@@ -169,6 +218,14 @@ func (s *MainSuite) SetupSuite() {
 func (s *MainSuite) TearDownSuite() {
 	s.cancel()
 	time.Sleep(50 * time.Millisecond)
+
+	if s.db != nil {
+		s.db.Close()
+	}
+
+	if s.pgContainer != nil {
+		s.pgContainer.Terminate(context.Background())
+	}
 
 	err := os.RemoveAll("./testdata")
 	s.Require().NoError(err)
@@ -233,52 +290,6 @@ func (s *MainSuite) TestUpdateMetric() {
 	}
 }
 
-func TestPingHandler_Success(t *testing.T) {
-	mockDB, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
-	assert.NoError(t, err)
-	defer mockDB.Close()
-
-	db := sqlx.NewDb(mockDB, "pgx")
-
-	mock.ExpectPing()
-
-	handler := pingHandler(db)
-
-	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
-	req = req.WithContext(context.Background())
-
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, req)
-
-	resp := w.Result()
-	defer resp.Body.Close()
-
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-}
-
-func TestPingHandler_DBError(t *testing.T) {
-	mockDB, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
-	assert.NoError(t, err)
-	defer mockDB.Close()
-
-	db := sqlx.NewDb(mockDB, "pgx")
-
-	mock.ExpectPing().WillReturnError(context.DeadlineExceeded)
-
-	handler := pingHandler(db)
-
-	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
-	req = req.WithContext(context.Background())
-
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, req)
-
-	resp := w.Result()
-	defer resp.Body.Close()
-
-	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
-}
-
 func (s *MainSuite) TestGetMetricValue() {
 	// Создадим метрики, чтобы потом получить их значения
 	_, err := s.client.R().Post("/update/gauge/temperature/42")
@@ -331,6 +342,64 @@ func (s *MainSuite) TestGetMetricValue() {
 	}
 }
 
+func (s *MainSuite) TestUpdateMetricWithBody() {
+	body := map[string]interface{}{
+		"id":    "cpu_load",
+		"type":  "gauge",
+		"value": 75.5,
+	}
+
+	resp, err := s.client.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(body).
+		Post("/update/")
+
+	s.Require().NoError(err)
+	s.Equal(http.StatusOK, resp.StatusCode())
+}
+
+func (s *MainSuite) TestGetMetricPath() {
+	// First update the metric
+	_, err := s.client.R().Post("/update/gauge/testmetric/123.45")
+	s.Require().NoError(err)
+
+	// Then get it
+	resp, err := s.client.R().Get("/value/gauge/testmetric")
+	s.Require().NoError(err)
+	s.Equal(http.StatusOK, resp.StatusCode())
+	s.Contains(resp.String(), "123.45")
+}
+
+func (s *MainSuite) TestGetMetricWithBody() {
+	// First update the metric
+	_, err := s.client.R().Post("/update/gauge/memusage/64.0")
+	s.Require().NoError(err)
+
+	// Request metric using JSON
+	body := map[string]interface{}{
+		"id":   "memusage",
+		"type": "gauge",
+	}
+	resp, err := s.client.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(body).
+		Post("/value/")
+
+	s.Require().NoError(err)
+	s.Equal(http.StatusOK, resp.StatusCode())
+
+	var metric struct {
+		ID    string   `json:"id"`
+		MType string   `json:"type"`
+		Value *float64 `json:"value"`
+	}
+	err = json.Unmarshal(resp.Body(), &metric)
+	s.Require().NoError(err)
+	s.Equal("memusage", metric.ID)
+	s.Equal("gauge", metric.MType)
+	s.NotNil(metric.Value)
+}
+
 func (s *MainSuite) TestGetMetricsListHTML() {
 	// Добавим метрики для отображения
 	_, err := s.client.R().Post("/update/gauge/temperature/42")
@@ -342,6 +411,52 @@ func (s *MainSuite) TestGetMetricsListHTML() {
 	s.Require().NoError(err)
 	s.Equal(http.StatusOK, resp.StatusCode())
 
+}
+
+func TestPingHandler_Success(t *testing.T) {
+	mockDB, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
+	assert.NoError(t, err)
+	defer mockDB.Close()
+
+	db := sqlx.NewDb(mockDB, "pgx")
+
+	mock.ExpectPing()
+
+	handler := pingHandler(db)
+
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	req = req.WithContext(context.Background())
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func TestPingHandler_DBError(t *testing.T) {
+	mockDB, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
+	assert.NoError(t, err)
+	defer mockDB.Close()
+
+	db := sqlx.NewDb(mockDB, "pgx")
+
+	mock.ExpectPing().WillReturnError(context.DeadlineExceeded)
+
+	handler := pingHandler(db)
+
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	req = req.WithContext(context.Background())
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
 }
 
 func TestMainSuite(t *testing.T) {
