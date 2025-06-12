@@ -11,12 +11,12 @@ import (
 )
 
 type metricsUpdateResult struct {
-	Request types.Metrics
+	Request []types.Metrics
 	Err     error
 }
 
 type MetricsUpdater interface {
-	Update(ctx context.Context, req types.Metrics) error
+	Updates(ctx context.Context, req []types.Metrics) error
 }
 
 func StartMetricAgentWorker(
@@ -42,8 +42,8 @@ func StartMetricAgentWorker(
 	logResults(ctx, reportMetricsCh)
 }
 
-func pollMetrics(ctx context.Context, pollInterval int, collectors []func() []types.Metrics) <-chan types.Metrics {
-	metricsCh := make(chan types.Metrics)
+func pollMetrics(ctx context.Context, pollInterval int, collectors []func() []types.Metrics) <-chan []types.Metrics {
+	metricsCh := make(chan []types.Metrics, 100)
 
 	go func() {
 		defer close(metricsCh)
@@ -59,9 +59,7 @@ func pollMetrics(ctx context.Context, pollInterval int, collectors []func() []ty
 				for _, collector := range collectors {
 					metrics := collector()
 					logger.Log.Infof("Collected %d metrics", len(metrics))
-					for _, m := range metrics {
-						metricsCh <- m
-					}
+					metricsCh <- metrics
 				}
 			}
 		}
@@ -124,7 +122,7 @@ func reportMetrics(
 	ctx context.Context,
 	metricsUpdater MetricsUpdater,
 	reportInterval int,
-	in <-chan types.Metrics,
+	in <-chan []types.Metrics,
 ) <-chan metricsUpdateResult {
 	out := make(chan metricsUpdateResult, 100)
 	ticker := time.NewTicker(time.Duration(reportInterval) * time.Second)
@@ -140,28 +138,28 @@ func reportMetrics(
 		for {
 			select {
 			case <-ctx.Done():
-				for _, m := range buffer {
-					err := metricsUpdater.Update(ctx, m)
-					out <- metricsUpdateResult{Request: m, Err: err}
+				if len(buffer) > 0 {
+					err := metricsUpdater.Updates(ctx, buffer)
+					out <- metricsUpdateResult{Request: buffer, Err: err}
 				}
 				return
 
 			case m, ok := <-in:
 				if !ok {
-					for _, mm := range buffer {
-						err := metricsUpdater.Update(ctx, mm)
-						out <- metricsUpdateResult{Request: mm, Err: err}
+					if len(buffer) > 0 {
+						err := metricsUpdater.Updates(ctx, buffer)
+						out <- metricsUpdateResult{Request: buffer, Err: err}
 					}
 					return
 				}
-				buffer = append(buffer, m)
+				buffer = append(buffer, m...)
 
 			case <-ticker.C:
-				for _, m := range buffer {
-					err := metricsUpdater.Update(ctx, m)
-					out <- metricsUpdateResult{Request: m, Err: err}
+				if len(buffer) > 0 {
+					err := metricsUpdater.Updates(ctx, buffer)
+					out <- metricsUpdateResult{Request: buffer, Err: err}
+					buffer = buffer[:0]
 				}
-				buffer = buffer[:0]
 			}
 		}
 	}()
@@ -179,9 +177,9 @@ func logResults(ctx context.Context, results <-chan metricsUpdateResult) {
 				return
 			}
 			if res.Err != nil {
-				logger.Log.Errorf("Failed to update metric %s (%s): %v", res.Request.ID, res.Request.MType, res.Err)
+				logger.Log.Errorf("Error: %v", res.Err)
 			} else {
-				logger.Log.Infof("Successfully updated metric %s (%s)", res.Request.ID, res.Request.MType)
+				logger.Log.Infof("Success")
 			}
 		}
 	}

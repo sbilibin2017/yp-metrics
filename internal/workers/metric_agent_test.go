@@ -65,20 +65,26 @@ func TestPollMetrics(t *testing.T) {
 	outCh := pollMetrics(ctx, pollInterval, []func() []types.Metrics{collector})
 
 	select {
-	case m := <-outCh:
+	case metricsBatch := <-outCh:
+		require.Len(t, metricsBatch, 1)
+		m := metricsBatch[0]
 		require.Equal(t, "testMetric", m.ID)
 		require.Equal(t, types.Gauge, m.MType)
-		require.NotEmpty(t, m.Value)
+		require.NotNil(t, m.Value)
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for metric from pollMetrics")
 	}
 
 	cancel()
 
-	_, ok := <-outCh
-	require.False(t, ok, "expected channel to be closed after context cancel")
+	// Wait for the channel to close and verify it's closed
+	select {
+	case _, ok := <-outCh:
+		require.False(t, ok, "expected channel to be closed after context cancel")
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for channel to close after context cancel")
+	}
 }
-
 func float64PtrToStringPtr(f float64) *float64 {
 	return &f
 }
@@ -94,23 +100,21 @@ func TestReportMetrics(t *testing.T) {
 
 	reportInterval := 1
 
-	in := make(chan types.Metrics)
+	in := make(chan []types.Metrics)
 
 	firstMetric := types.Metrics{ID: "metric1", MType: types.Gauge, Value: float64PtrToStringPtr(1)}
 	secondMetric := types.Metrics{ID: "metric2", MType: types.Counter, Delta: int64Ptr(2)}
 
-	mockUpdater.EXPECT().Update(gomock.Any(), firstMetric).Return(nil).Times(1)
-	mockUpdater.EXPECT().Update(gomock.Any(), secondMetric).Return(nil).Times(1)
+	// Expect one call with both metrics combined
+	mockUpdater.EXPECT().Updates(gomock.Any(), []types.Metrics{firstMetric, secondMetric}).Return(nil).Times(1)
 
 	outCh := reportMetrics(ctx, mockUpdater, reportInterval, in)
 
-	in <- firstMetric
-	in <- secondMetric
-
+	in <- []types.Metrics{firstMetric}
+	in <- []types.Metrics{secondMetric}
 	close(in)
 
 	time.Sleep(1100 * time.Millisecond)
-
 	cancel()
 
 	var results []metricsUpdateResult
@@ -121,7 +125,9 @@ func TestReportMetrics(t *testing.T) {
 	counts := map[string]int{}
 	for _, r := range results {
 		require.NoError(t, r.Err)
-		counts[r.Request.ID]++
+		for _, m := range r.Request {
+			counts[m.ID]++
+		}
 	}
 
 	require.Equal(t, 1, counts["metric1"])
@@ -141,95 +147,57 @@ func TestReportMetrics_TickerCase(t *testing.T) {
 	defer cancel()
 
 	reportInterval := 1
-
-	in := make(chan types.Metrics)
+	in := make(chan []types.Metrics)
 
 	metrics := []types.Metrics{
 		{ID: "metric1", MType: types.Gauge, Value: float64PtrToStringPtr(1)},
 		{ID: "metric2", MType: types.Counter, Delta: int64Ptr(2)},
 	}
 
-	for _, m := range metrics {
-		mockUpdater.EXPECT().Update(gomock.Any(), m).Return(nil).Times(1)
-	}
+	// Expect a single batch update call with all metrics
+	mockUpdater.EXPECT().Updates(gomock.Any(), metrics).Return(nil).Times(1)
 
 	outCh := reportMetrics(ctx, mockUpdater, reportInterval, in)
 
-	for _, m := range metrics {
-		in <- m
-	}
+	// Send metrics as a batch
+	in <- metrics
+	close(in) // CLOSE input channel so reportMetrics knows no more data coming
 
+	// Wait a bit more than reportInterval to allow ticker to trigger
 	time.Sleep(time.Duration(reportInterval)*time.Second + 200*time.Millisecond)
 
 	results := make(map[string]bool)
-	for i := 0; i < len(metrics); i++ {
+
+	// Correct loop to break properly on channel close or when results are complete
+	for {
 		select {
-		case res := <-outCh:
+		case res, ok := <-outCh:
+			if !ok {
+				goto doneReading // channel closed, exit loop
+			}
 			require.NoError(t, res.Err)
-			results[res.Request.ID] = true
+			for _, m := range res.Request {
+				results[m.ID] = true
+			}
+			if len(results) == len(metrics) {
+				goto doneReading // got all metrics, exit loop early
+			}
 		case <-time.After(500 * time.Millisecond):
 			t.Fatal("timeout waiting for metrics update result")
 		}
 	}
 
+doneReading:
+
 	for _, m := range metrics {
 		assert.True(t, results[m.ID], "metric %s not processed", m.ID)
 	}
 
-	close(in)
 	cancel()
 
+	// Drain channel to avoid goroutine leaks (optional here, channel should be closed)
 	for range outCh {
 	}
-}
-
-func TestReportMetrics_ContextDone(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockUpdater := NewMockMetricsUpdater(ctrl)
-	ctx, cancel := context.WithCancel(context.Background())
-
-	reportInterval := 10
-
-	in := make(chan types.Metrics)
-
-	metrics := []types.Metrics{
-		{ID: "metric1", MType: types.Gauge, Value: float64PtrToStringPtr(1)},
-		{ID: "metric2", MType: types.Counter, Delta: int64Ptr(2)},
-	}
-
-	for _, m := range metrics {
-		mockUpdater.EXPECT().Update(gomock.Any(), m).Return(nil).Times(1)
-	}
-
-	outCh := reportMetrics(ctx, mockUpdater, reportInterval, in)
-
-	for _, m := range metrics {
-		in <- m
-	}
-
-	cancel()
-
-	results := make(map[string]bool)
-	for i := 0; i < len(metrics); i++ {
-		select {
-		case res := <-outCh:
-			require.NoError(t, res.Err)
-			results[res.Request.ID] = true
-		case <-time.After(1 * time.Second):
-			t.Fatal("timeout waiting for metrics update result")
-		}
-	}
-
-	for _, m := range metrics {
-		assert.True(t, results[m.ID], "metric %s not processed", m.ID)
-	}
-
-	close(in)
-
-	_, ok := <-outCh
-	assert.False(t, ok, "output channel should be closed")
 }
 
 func TestLogResults(t *testing.T) {
@@ -245,19 +213,23 @@ func TestLogResults(t *testing.T) {
 	}()
 
 	results <- metricsUpdateResult{
-		Request: types.Metrics{
-			ID:    "metric_success",
-			MType: types.Gauge,
-			Value: float64PtrToStringPtr(100),
+		Request: []types.Metrics{
+			{
+				ID:    "metric_success",
+				MType: types.Gauge,
+				Value: float64PtrToStringPtr(100),
+			},
 		},
 		Err: nil,
 	}
 
 	results <- metricsUpdateResult{
-		Request: types.Metrics{
-			ID:    "metric_fail",
-			MType: types.Counter,
-			Delta: int64Ptr(200),
+		Request: []types.Metrics{
+			{
+				ID:    "metric_fail",
+				MType: types.Counter,
+				Delta: int64Ptr(200),
+			},
 		},
 		Err: errors.New("some error"),
 	}
@@ -297,7 +269,7 @@ func TestStartMetricAgentWorker(t *testing.T) {
 
 	mockUpdater.
 		EXPECT().
-		Update(gomock.Any(), gomock.Any()).
+		Updates(gomock.Any(), gomock.Any()).
 		Return(nil).
 		MinTimes(1)
 

@@ -183,6 +183,7 @@
 | iter9    | Добавление загрузки и сохранения метрик сервером из файла | https://github.com/sbilibin2017/yp-metrics/pull/9|
 | iter10    | Добавление подключения к бд (postgres) | https://github.com/sbilibin2017/yp-metrics/pull/10|
 | iter11    | Добавление работы сервера с бд и стратегий(использован паттерн стратегия) хранения метрик(бд>файл>память) | https://github.com/sbilibin2017/yp-metrics/pull/11|
+| iter12    | Добавление обработчика для массового обновления метрик | https://github.com/sbilibin2017/yp-metrics/pull/12|
 
 ---
 
