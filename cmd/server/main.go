@@ -275,7 +275,6 @@ func newDB(ctx context.Context, dsn string) (*sqlx.DB, error) {
 		return nil, err
 	}
 
-	// Get current source file directory
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
 		logger.Log.Errorw("Failed to get caller info")
