@@ -147,6 +147,7 @@ func run(ctx context.Context) error {
 
 	metricUpdatePathHandler := handlers.MetricUpdatePathHandler(validators.ValidateMetricPath, metricUpdateService)
 	metricUpdateBodyHandler := handlers.MetricUpdateBodyHandler(validators.ValidateMetricBody, metricUpdateService)
+	metricUpdatesBodyHandler := handlers.MetricUpdatesBodyHandler(validators.ValidateMetricBody, metricUpdateService)
 	metricGetPathHandler := handlers.MetricGetPathHandler(validators.ValidateMetricIDPath, metricGetService)
 	metricGetBodyHandler := handlers.MetricGetBodyHandler(validators.ValidateMetricIDPath, metricGetService)
 	metricListHTMLHandler := handlers.MetricListHTMLHandler(metricListService)
@@ -154,6 +155,7 @@ func run(ctx context.Context) error {
 	metricRouter := newMetricRouter(
 		metricUpdatePathHandler,
 		metricUpdateBodyHandler,
+		metricUpdatesBodyHandler,
 		metricGetPathHandler,
 		metricGetBodyHandler,
 		metricListHTMLHandler,
@@ -220,6 +222,7 @@ func run(ctx context.Context) error {
 func newMetricRouter(
 	metricUpdatePathHandler http.HandlerFunc,
 	metricUpdateBodyHandler http.HandlerFunc,
+	metricUpdatesBodyHandler http.HandlerFunc,
 	metricGetPathHandler http.HandlerFunc,
 	metricGetBodyHandler http.HandlerFunc,
 	metricListHTMLHandler http.HandlerFunc,
@@ -236,6 +239,7 @@ func newMetricRouter(
 	router.Post("/update/{type}/{name}/{value}", metricUpdatePathHandler)
 	router.Post("/update/{type}/{name}", metricUpdatePathHandler)
 	router.Post("/update/", metricUpdateBodyHandler)
+	router.Post("/updates/", metricUpdatesBodyHandler)
 
 	router.Get("/value/{type}/{name}", metricGetPathHandler)
 	router.Get("/value/{type}", metricGetPathHandler)

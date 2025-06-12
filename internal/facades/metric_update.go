@@ -13,9 +13,8 @@ import (
 )
 
 type MetricUpdateFacade struct {
-	client         *resty.Client
-	serverAddr     string
-	serverEndpoint string
+	client     *resty.Client
+	serverAddr string
 }
 
 func NewMetricUpdateFacade(client *resty.Client, serverAddr string) *MetricUpdateFacade {
@@ -25,12 +24,12 @@ func NewMetricUpdateFacade(client *resty.Client, serverAddr string) *MetricUpdat
 	}
 }
 
-func (f *MetricUpdateFacade) Update(ctx context.Context, req types.Metrics) error {
+func (f *MetricUpdateFacade) Updates(ctx context.Context, req []types.Metrics) error {
 	addr := f.serverAddr
 	if !strings.HasPrefix(addr, "http://") && !strings.HasPrefix(addr, "https://") {
 		addr = "http://" + addr
 	}
-	addr += "/update/"
+	addr += "/updates/"
 
 	compressedBody, err := compressBody(req)
 
@@ -56,7 +55,7 @@ func (f *MetricUpdateFacade) Update(ctx context.Context, req types.Metrics) erro
 	return nil
 }
 
-func compressBody(data types.Metrics) ([]byte, error) {
+func compressBody(data []types.Metrics) ([]byte, error) {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return nil, err

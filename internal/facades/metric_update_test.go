@@ -23,13 +23,15 @@ func TestMetricUpdateFacade_Update_Success(t *testing.T) {
 	facade := NewMetricUpdateFacade(client, ts.URL)
 
 	val := 42.0
-	req := types.Metrics{
+	m := types.Metrics{
 		ID:    "metric1",
 		MType: types.Gauge,
 		Value: &val,
 	}
 
-	err := facade.Update(context.Background(), req)
+	req := []types.Metrics{m, m}
+
+	err := facade.Updates(context.Background(), req)
 	assert.NoError(t, err)
 }
 
@@ -44,13 +46,15 @@ func TestMetricUpdateFacade_Update_HTTPError(t *testing.T) {
 	facade := NewMetricUpdateFacade(client, ts.URL)
 
 	val := int64(10)
-	req := types.Metrics{
+	m := types.Metrics{
 		ID:    "metric1",
 		MType: types.Counter,
 		Delta: &val,
 	}
 
-	err := facade.Update(context.Background(), req)
+	req := []types.Metrics{m, m}
+
+	err := facade.Updates(context.Background(), req)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "server returned status 500")
 }
@@ -67,14 +71,15 @@ func TestMetricUpdateFacade_Update_ContextCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	val := 100.0
-	req := types.Metrics{
+	val := int64(10)
+	m := types.Metrics{
 		ID:    "metric1",
-		MType: types.Gauge,
-		Value: &val,
+		MType: types.Counter,
+		Delta: &val,
 	}
+	req := []types.Metrics{m, m}
 
-	err := facade.Update(ctx, req)
+	err := facade.Updates(ctx, req)
 	assert.Error(t, err)
 }
 
@@ -92,13 +97,14 @@ func TestMetricUpdateFacade_AddsHTTPPrefix(t *testing.T) {
 	client := resty.New()
 	facade := NewMetricUpdateFacade(client, addr)
 
-	val := 42.0
-	req := types.Metrics{
+	val := int64(10)
+	m := types.Metrics{
 		ID:    "metric1",
-		MType: types.Gauge,
-		Value: &val,
+		MType: types.Counter,
+		Delta: &val,
 	}
+	req := []types.Metrics{m, m}
 
-	err := facade.Update(context.Background(), req)
+	err := facade.Updates(context.Background(), req)
 	assert.NoError(t, err)
 }
