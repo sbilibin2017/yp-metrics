@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/sbilibin2017/yp-metrics/internal/types"
@@ -18,6 +19,14 @@ type MetricUpdateFacade struct {
 }
 
 func NewMetricUpdateFacade(client *resty.Client, serverAddr string) *MetricUpdateFacade {
+	client.
+		SetRetryCount(3).
+		SetRetryWaitTime(1 * time.Second).
+		SetRetryMaxWaitTime(5 * time.Second).
+		AddRetryCondition(func(r *resty.Response, err error) bool {
+			return err != nil || (r != nil && r.StatusCode() >= 400)
+		})
+
 	return &MetricUpdateFacade{
 		client:     client,
 		serverAddr: serverAddr,
