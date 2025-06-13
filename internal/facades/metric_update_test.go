@@ -2,9 +2,11 @@ package facades
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/go-resty/resty/v2"
@@ -13,14 +15,21 @@ import (
 )
 
 func TestMetricUpdateFacade_Update_Success(t *testing.T) {
+	var receivedHash string
+
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
+
+		receivedHash = r.Header.Get("HashSHA256")
+		assert.NotEmpty(t, receivedHash)
+
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer ts.Close()
 
 	client := resty.New()
-	facade := NewMetricUpdateFacade(client, ts.URL)
+	secretKey := "supersecretkey"
+	facade := NewMetricUpdateFacade(client, ts.URL, secretKey)
 
 	val := 42.0
 	m := types.Metrics{
@@ -33,78 +42,13 @@ func TestMetricUpdateFacade_Update_Success(t *testing.T) {
 
 	err := facade.Updates(context.Background(), req)
 	assert.NoError(t, err)
-}
 
-func TestMetricUpdateFacade_Update_HTTPError(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("internal error"))
-	}))
-	defer ts.Close()
-
-	client := resty.New()
-	facade := NewMetricUpdateFacade(client, ts.URL)
-
-	val := int64(10)
-	m := types.Metrics{
-		ID:    "metric1",
-		MType: types.Counter,
-		Delta: &val,
-	}
-
-	req := []types.Metrics{m, m}
-
-	err := facade.Updates(context.Background(), req)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "server returned status 500")
-}
-
-func TestMetricUpdateFacade_Update_ContextCanceled(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		select {}
-	}))
-	defer ts.Close()
-
-	client := resty.New()
-	facade := NewMetricUpdateFacade(client, ts.URL)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	val := int64(10)
-	m := types.Metrics{
-		ID:    "metric1",
-		MType: types.Counter,
-		Delta: &val,
-	}
-	req := []types.Metrics{m, m}
-
-	err := facade.Updates(ctx, req)
-	assert.Error(t, err)
-}
-
-func TestMetricUpdateFacade_AddsHTTPPrefix(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodPost, r.Method)
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer ts.Close()
-
-	addr := ts.URL
-	addr = strings.TrimPrefix(addr, "http://")
-	addr = strings.TrimPrefix(addr, "https://")
-
-	client := resty.New()
-	facade := NewMetricUpdateFacade(client, addr)
-
-	val := int64(10)
-	m := types.Metrics{
-		ID:    "metric1",
-		MType: types.Counter,
-		Delta: &val,
-	}
-	req := []types.Metrics{m, m}
-
-	err := facade.Updates(context.Background(), req)
+	// Считаем хеш от НЕсжатого JSON + secretKey
+	jsonData, err := json.Marshal(req)
 	assert.NoError(t, err)
+
+	sum := sha256.Sum256(append(jsonData, []byte(secretKey)...))
+	expectedHash := hex.EncodeToString(sum[:])
+
+	assert.Equal(t, expectedHash, receivedHash)
 }

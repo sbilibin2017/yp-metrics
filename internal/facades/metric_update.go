@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -16,9 +18,10 @@ import (
 type MetricUpdateFacade struct {
 	client     *resty.Client
 	serverAddr string
+	secretKey  string
 }
 
-func NewMetricUpdateFacade(client *resty.Client, serverAddr string) *MetricUpdateFacade {
+func NewMetricUpdateFacade(client *resty.Client, serverAddr string, secretKey string) *MetricUpdateFacade {
 	client.
 		SetRetryCount(3).
 		SetRetryWaitTime(1 * time.Second).
@@ -30,6 +33,7 @@ func NewMetricUpdateFacade(client *resty.Client, serverAddr string) *MetricUpdat
 	return &MetricUpdateFacade{
 		client:     client,
 		serverAddr: serverAddr,
+		secretKey:  secretKey,
 	}
 }
 
@@ -40,19 +44,38 @@ func (f *MetricUpdateFacade) Updates(ctx context.Context, req []types.Metrics) e
 	}
 	addr += "/updates/"
 
-	compressedBody, err := compressBody(req)
-
+	jsonData, err := json.Marshal(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	resp, err := f.client.R().
+	var hashHeader string
+	if f.secretKey != "" {
+		sum := sha256.Sum256(append(jsonData, []byte(f.secretKey)...))
+		hashHeader = hex.EncodeToString(sum[:])
+	}
+
+	var compressedBuf bytes.Buffer
+	gzw := gzip.NewWriter(&compressedBuf)
+	if _, err := gzw.Write(jsonData); err != nil {
+		return fmt.Errorf("gzip write failed: %w", err)
+	}
+	if err := gzw.Close(); err != nil {
+		return fmt.Errorf("gzip close failed: %w", err)
+	}
+	compressedBody := compressedBuf.Bytes()
+
+	reqBuilder := f.client.R().
 		SetContext(ctx).
 		SetBody(compressedBody).
 		SetHeader("Content-Type", "application/json").
-		SetHeader("Content-Encoding", "gzip").
-		Post(addr)
+		SetHeader("Content-Encoding", "gzip")
 
+	if hashHeader != "" {
+		reqBuilder.SetHeader("HashSHA256", hashHeader)
+	}
+
+	resp, err := reqBuilder.Post(addr)
 	if err != nil {
 		return err
 	}
@@ -62,25 +85,4 @@ func (f *MetricUpdateFacade) Updates(ctx context.Context, req []types.Metrics) e
 	}
 
 	return nil
-}
-
-func compressBody(data []types.Metrics) ([]byte, error) {
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return nil, err
-	}
-
-	var buf bytes.Buffer
-	gzw := gzip.NewWriter(&buf)
-
-	_, err = gzw.Write(jsonData)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := gzw.Close(); err != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
 }

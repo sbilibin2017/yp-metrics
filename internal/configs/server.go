@@ -7,6 +7,7 @@ type ServerConfig struct {
 	Restore         bool
 	DatabaseDSN     string
 	LogLevel        string
+	HashKey         string
 }
 
 type ServerOption func(*ServerConfig)

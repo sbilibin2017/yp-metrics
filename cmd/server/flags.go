@@ -18,6 +18,7 @@ func parseFlags() *configs.ServerConfig {
 		withRestore(fs),
 		withDatabaseDSN(fs),
 		withLogLevel(fs),
+		withHashKey(fs),
 	}
 
 	fs.Parse(os.Args[1:])
@@ -103,6 +104,19 @@ func withLogLevel(fs *flag.FlagSet) configs.ServerOption {
 			cfg.LogLevel = env
 		} else {
 			cfg.LogLevel = level
+		}
+	}
+}
+
+func withHashKey(fs *flag.FlagSet) configs.ServerOption {
+	var key string
+	fs.StringVar(&key, "k", "", "hash key")
+
+	return func(cfg *configs.ServerConfig) {
+		if env := os.Getenv("KEY"); env != "" {
+			cfg.HashKey = env
+		} else {
+			cfg.HashKey = key
 		}
 	}
 }

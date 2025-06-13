@@ -205,6 +205,7 @@
 | iter11    | Добавление работы сервера с бд и стратегий(использован паттерн стратегия) хранения метрик(бд>файл>память) | https://github.com/sbilibin2017/yp-metrics/pull/11|
 | iter12    | Добавление обработчика для массового обновления метрик | https://github.com/sbilibin2017/yp-metrics/pull/12|
 | iter13    | Добавление обработки retriable ошибок сервера и агента | https://github.com/sbilibin2017/yp-metrics/pull/13|
+| iter14    | Добавление хэширования запросов и ответов сервера и агента | https://github.com/sbilibin2017/yp-metrics/pull/14|
 
 ---
 
