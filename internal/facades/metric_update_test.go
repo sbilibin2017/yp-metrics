@@ -20,7 +20,8 @@ func TestMetricUpdateFacade_Update_Success(t *testing.T) {
 	defer ts.Close()
 
 	client := resty.New()
-	facade := NewMetricUpdateFacade(client, ts.URL)
+	// Передаем пустой hashHeader и hashKey, чтобы не считать хеш
+	facade := NewMetricUpdateFacade(client, ts.URL, "", "")
 
 	val := 42.0
 	m := types.Metrics{
@@ -43,7 +44,7 @@ func TestMetricUpdateFacade_Update_HTTPError(t *testing.T) {
 	defer ts.Close()
 
 	client := resty.New()
-	facade := NewMetricUpdateFacade(client, ts.URL)
+	facade := NewMetricUpdateFacade(client, ts.URL, "", "")
 
 	val := int64(10)
 	m := types.Metrics{
@@ -66,7 +67,7 @@ func TestMetricUpdateFacade_Update_ContextCanceled(t *testing.T) {
 	defer ts.Close()
 
 	client := resty.New()
-	facade := NewMetricUpdateFacade(client, ts.URL)
+	facade := NewMetricUpdateFacade(client, ts.URL, "", "")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -95,7 +96,7 @@ func TestMetricUpdateFacade_AddsHTTPPrefix(t *testing.T) {
 	addr = strings.TrimPrefix(addr, "https://")
 
 	client := resty.New()
-	facade := NewMetricUpdateFacade(client, addr)
+	facade := NewMetricUpdateFacade(client, addr, "", "")
 
 	val := int64(10)
 	m := types.Metrics{

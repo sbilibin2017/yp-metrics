@@ -16,6 +16,8 @@ func parseFlags() *configs.AgentConfig {
 		withPollInterval(fs),
 		withReportInterval(fs),
 		withLogLevel(fs),
+		withHashKey(fs),
+		withHashHeader(fs),
 	}
 
 	fs.Parse(os.Args[1:])
@@ -75,6 +77,32 @@ func withLogLevel(fs *flag.FlagSet) configs.AgentOption {
 			cfg.LogLevel = env
 		} else {
 			cfg.LogLevel = level
+		}
+	}
+}
+
+func withHashKey(fs *flag.FlagSet) configs.AgentOption {
+	var key string
+	fs.StringVar(&key, "k", "", "secret key for HMAC SHA256")
+
+	return func(cfg *configs.AgentConfig) {
+		if env := os.Getenv("KEY"); env != "" {
+			cfg.HashKey = env
+		} else {
+			cfg.HashKey = key
+		}
+	}
+}
+
+func withHashHeader(fs *flag.FlagSet) configs.AgentOption {
+	var header string
+	fs.StringVar(&header, "h", "HashSHA256", "name of HTTP header for HMAC SHA256")
+
+	return func(cfg *configs.AgentConfig) {
+		if env := os.Getenv("HASH_HEADER"); env != "" {
+			cfg.HashHeader = env
+		} else {
+			cfg.HashHeader = header
 		}
 	}
 }

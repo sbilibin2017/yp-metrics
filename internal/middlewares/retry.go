@@ -45,7 +45,7 @@ func RetryMiddleware(next http.Handler) http.Handler {
 			}
 		}
 
-		http.Error(w, "Retry limit exceeded", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
 	})
 }
 

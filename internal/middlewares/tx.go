@@ -17,7 +17,7 @@ func TxMiddleware(db *sqlx.DB, txSetter func(ctx context.Context, tx *sqlx.Tx) c
 
 			tx, err := db.Beginx()
 			if err != nil {
-				http.Error(w, "Failed to begin transaction", http.StatusInternalServerError)
+				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 
@@ -26,7 +26,7 @@ func TxMiddleware(db *sqlx.DB, txSetter func(ctx context.Context, tx *sqlx.Tx) c
 
 			defer func() {
 				if rec := recover(); rec != nil {
-					tx.Rollback()
+					_ = tx.Rollback()
 					panic(rec)
 				}
 			}()
@@ -34,7 +34,7 @@ func TxMiddleware(db *sqlx.DB, txSetter func(ctx context.Context, tx *sqlx.Tx) c
 			next.ServeHTTP(w, r)
 
 			if err := tx.Commit(); err != nil {
-				tx.Rollback()
+				_ = tx.Rollback()
 			}
 		})
 	}

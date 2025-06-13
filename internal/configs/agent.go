@@ -5,6 +5,8 @@ type AgentConfig struct {
 	PollInterval   int
 	ReportInterval int
 	LogLevel       string
+	HashKey        string
+	HashHeader     string
 }
 
 type AgentOption func(cfg *AgentConfig)

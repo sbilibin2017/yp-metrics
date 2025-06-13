@@ -2,13 +2,13 @@ build-server:
 	go build -o ./cmd/server/server ./cmd/server/
 
 run-server:
-	./cmd/server/server -d "postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable"
+	./cmd/server/server -d "postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable" -k "key"
 
 build-agent:
 	go build -o ./cmd/agent/agent ./cmd/agent/
 
 run-agent:
-	./cmd/agent/agent
+	./cmd/agent/agent -k "key"
 
 mockgen:	
 	mockgen -source=$(file) \
