@@ -1,10 +1,10 @@
 package facades
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
-	"encoding/json"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -16,9 +16,11 @@ import (
 type MetricUpdateFacade struct {
 	client     *resty.Client
 	serverAddr string
+	hashKey    string
+	hashHeader string
 }
 
-func NewMetricUpdateFacade(client *resty.Client, serverAddr string) *MetricUpdateFacade {
+func NewMetricUpdateFacade(client *resty.Client, serverAddr string, hashKey, hashHeader string) *MetricUpdateFacade {
 	client.
 		SetRetryCount(3).
 		SetRetryWaitTime(1 * time.Second).
@@ -30,6 +32,8 @@ func NewMetricUpdateFacade(client *resty.Client, serverAddr string) *MetricUpdat
 	return &MetricUpdateFacade{
 		client:     client,
 		serverAddr: serverAddr,
+		hashKey:    hashKey,
+		hashHeader: hashHeader,
 	}
 }
 
@@ -40,19 +44,25 @@ func (f *MetricUpdateFacade) Updates(ctx context.Context, req []types.Metrics) e
 	}
 	addr += "/updates/"
 
-	compressedBody, err := compressBody(req)
-
+	jsonBytes, err := f.client.JSONMarshal(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
-	resp, err := f.client.R().
+	r := f.client.R().
 		SetContext(ctx).
-		SetBody(compressedBody).
+		SetBody(req).
 		SetHeader("Content-Type", "application/json").
-		SetHeader("Content-Encoding", "gzip").
-		Post(addr)
+		SetHeader("Content-Encoding", "gzip")
 
+	if f.hashKey != "" && f.hashHeader != "" {
+		h := hmac.New(sha256.New, []byte(f.hashKey))
+		h.Write(jsonBytes)
+		signature := hex.EncodeToString(h.Sum(nil))
+		r.SetHeader(f.hashHeader, signature)
+	}
+
+	resp, err := r.Post(addr)
 	if err != nil {
 		return err
 	}
@@ -62,25 +72,4 @@ func (f *MetricUpdateFacade) Updates(ctx context.Context, req []types.Metrics) e
 	}
 
 	return nil
-}
-
-func compressBody(data []types.Metrics) ([]byte, error) {
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return nil, err
-	}
-
-	var buf bytes.Buffer
-	gzw := gzip.NewWriter(&buf)
-
-	_, err = gzw.Write(jsonData)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := gzw.Close(); err != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
 }

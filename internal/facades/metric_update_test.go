@@ -2,6 +2,9 @@ package facades
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,26 +15,39 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func computeHMAC(data []byte, key string) string {
+	h := hmac.New(sha256.New, []byte(key))
+	h.Write(data)
+	return hex.EncodeToString(h.Sum(nil))
+}
+
 func TestMetricUpdateFacade_Update_Success(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodPost, r.Method)
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer ts.Close()
-
-	client := resty.New()
-	facade := NewMetricUpdateFacade(client, ts.URL)
-
 	val := 42.0
 	m := types.Metrics{
 		ID:    "metric1",
 		MType: types.Gauge,
 		Value: &val,
 	}
-
 	req := []types.Metrics{m, m}
 
-	err := facade.Updates(context.Background(), req)
+	// Marshal body to compute expected HMAC
+	client := resty.New()
+	jsonBytes, err := client.JSONMarshal(req)
+	assert.NoError(t, err)
+	hashKey := "secret"
+	hashHeader := "HashSHA256"
+	expectedHMAC := computeHMAC(jsonBytes, hashKey)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		// Проверяем, что заголовок с хешем присутствует и корректен
+		assert.Equal(t, expectedHMAC, r.Header.Get(hashHeader))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	facade := NewMetricUpdateFacade(client, ts.URL, hashKey, hashHeader)
+	err = facade.Updates(context.Background(), req)
 	assert.NoError(t, err)
 }
 
@@ -43,7 +59,7 @@ func TestMetricUpdateFacade_Update_HTTPError(t *testing.T) {
 	defer ts.Close()
 
 	client := resty.New()
-	facade := NewMetricUpdateFacade(client, ts.URL)
+	facade := NewMetricUpdateFacade(client, ts.URL, "", "")
 
 	val := int64(10)
 	m := types.Metrics{
@@ -51,7 +67,6 @@ func TestMetricUpdateFacade_Update_HTTPError(t *testing.T) {
 		MType: types.Counter,
 		Delta: &val,
 	}
-
 	req := []types.Metrics{m, m}
 
 	err := facade.Updates(context.Background(), req)
@@ -66,7 +81,7 @@ func TestMetricUpdateFacade_Update_ContextCanceled(t *testing.T) {
 	defer ts.Close()
 
 	client := resty.New()
-	facade := NewMetricUpdateFacade(client, ts.URL)
+	facade := NewMetricUpdateFacade(client, ts.URL, "", "")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -95,7 +110,7 @@ func TestMetricUpdateFacade_AddsHTTPPrefix(t *testing.T) {
 	addr = strings.TrimPrefix(addr, "https://")
 
 	client := resty.New()
-	facade := NewMetricUpdateFacade(client, addr)
+	facade := NewMetricUpdateFacade(client, addr, "", "")
 
 	val := int64(10)
 	m := types.Metrics{

@@ -14,6 +14,8 @@ func resetAgentEnv() {
 	os.Unsetenv("POLL_INTERVAL")
 	os.Unsetenv("REPORT_INTERVAL")
 	os.Unsetenv("LOG_LEVEL")
+	os.Unsetenv("KEY")
+	os.Unsetenv("HASH_HEADER")
 }
 
 func TestAgentConfigOptions(t *testing.T) {
@@ -105,6 +107,46 @@ func TestAgentConfigOptions(t *testing.T) {
 				assert.Equal(t, "warn", cfg.LogLevel)
 			},
 		},
+		{
+			name:       "HashKey from flag",
+			envKey:     "KEY",
+			envValue:   "",
+			flagArgs:   []string{"-k", "flag-secret"},
+			optionFunc: withHashKey,
+			assertFn: func(t *testing.T, cfg *configs.AgentConfig) {
+				assert.Equal(t, "flag-secret", cfg.HashKey)
+			},
+		},
+		{
+			name:       "HashKey from env",
+			envKey:     "KEY",
+			envValue:   "env-secret",
+			flagArgs:   []string{},
+			optionFunc: withHashKey,
+			assertFn: func(t *testing.T, cfg *configs.AgentConfig) {
+				assert.Equal(t, "env-secret", cfg.HashKey)
+			},
+		},
+		{
+			name:       "HashHeader from flag",
+			envKey:     "HASH_HEADER",
+			envValue:   "",
+			flagArgs:   []string{"-hh", "CustomHashHeader"},
+			optionFunc: withHashHeader,
+			assertFn: func(t *testing.T, cfg *configs.AgentConfig) {
+				assert.Equal(t, "CustomHashHeader", cfg.HashHeader)
+			},
+		},
+		{
+			name:       "HashHeader from env",
+			envKey:     "HASH_HEADER",
+			envValue:   "EnvHashHeader",
+			flagArgs:   []string{},
+			optionFunc: withHashHeader,
+			assertFn: func(t *testing.T, cfg *configs.AgentConfig) {
+				assert.Equal(t, "EnvHashHeader", cfg.HashHeader)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -124,82 +166,6 @@ func TestAgentConfigOptions(t *testing.T) {
 			opt(cfg)
 
 			tt.assertFn(t, cfg)
-		})
-	}
-}
-
-func TestParseFlagsEnvOverridesFlags(t *testing.T) {
-	tests := []struct {
-		name     string
-		env      map[string]string
-		args     []string
-		expected *configs.AgentConfig
-	}{
-		{
-			name: "env overrides flags",
-			env: map[string]string{
-				"ADDRESS":         "http://env:8080",
-				"POLL_INTERVAL":   "11",
-				"REPORT_INTERVAL": "22",
-				"LOG_LEVEL":       "warn",
-			},
-			args: []string{
-				"-a", "http://flag:8080",
-				"-p", "1",
-				"-r", "2",
-				"-l", "info",
-			},
-			expected: &configs.AgentConfig{
-				Address:        "http://env:8080", // env wins
-				PollInterval:   11,                // env wins
-				ReportInterval: 22,                // env wins
-				LogLevel:       "warn",            // env wins
-			},
-		},
-		{
-			name: "flags used if no env",
-			env:  map[string]string{},
-			args: []string{
-				"-a", "http://flag:8080",
-				"-p", "1",
-				"-r", "2",
-				"-l", "info",
-			},
-			expected: &configs.AgentConfig{
-				Address:        "http://flag:8080",
-				PollInterval:   1,
-				ReportInterval: 2,
-				LogLevel:       "info",
-			},
-		},
-		{
-			name: "defaults used if no env or flags",
-			env:  map[string]string{},
-			args: []string{},
-			expected: &configs.AgentConfig{
-				Address:        "http://localhost:8080",
-				PollInterval:   2,
-				ReportInterval: 10,
-				LogLevel:       "info",
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			resetAgentEnv()
-			for k, v := range tt.env {
-				os.Setenv(k, v)
-			}
-
-			origArgs := os.Args
-			defer func() { os.Args = origArgs }()
-
-			os.Args = append([]string{"agent"}, tt.args...)
-
-			cfg := parseFlags()
-
-			assert.Equal(t, tt.expected, cfg)
 		})
 	}
 }

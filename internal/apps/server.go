@@ -103,6 +103,7 @@ func NewServerApp(config *configs.ServerConfig) (*ServerApp, error) {
 		middlewares.GzipMiddleware,
 		middlewares.TxMiddleware(db, contexts.SetTxToContext),
 		middlewares.RetryMiddleware,
+		middlewares.HashMiddleware(config.HashHeader, config.HashKey),
 	}
 
 	router := chi.NewRouter()

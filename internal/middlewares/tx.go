@@ -17,7 +17,7 @@ func TxMiddleware(db *sqlx.DB, txSetter func(ctx context.Context, tx *sqlx.Tx) c
 
 			tx, err := db.Beginx()
 			if err != nil {
-				http.Error(w, "Failed to begin transaction", http.StatusInternalServerError)
+				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 

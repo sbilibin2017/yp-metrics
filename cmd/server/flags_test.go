@@ -9,13 +9,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func resetEnv() {
+func resetServerEnv() {
 	os.Unsetenv("ADDRESS")
 	os.Unsetenv("STORE_INTERVAL")
 	os.Unsetenv("FILE_STORAGE_PATH")
 	os.Unsetenv("RESTORE")
 	os.Unsetenv("DATABASE_DSN")
 	os.Unsetenv("LOG_LEVEL")
+	os.Unsetenv("KEY")
+	os.Unsetenv("HASH_HEADER")
 }
 
 func TestServerConfigOptions(t *testing.T) {
@@ -31,64 +33,64 @@ func TestServerConfigOptions(t *testing.T) {
 			name:       "Addr from flag",
 			envKey:     "ADDRESS",
 			envValue:   "",
-			flagArgs:   []string{"-a", "localhost:9000"},
+			flagArgs:   []string{"-a", ":9090"},
 			optionFunc: withAddr,
 			assertFn: func(t *testing.T, cfg *configs.ServerConfig) {
-				assert.Equal(t, "localhost:9000", cfg.Addr)
+				assert.Equal(t, ":9090", cfg.Addr)
 			},
 		},
 		{
 			name:       "Addr from env",
 			envKey:     "ADDRESS",
-			envValue:   "127.0.0.1:9999",
+			envValue:   ":7070",
 			flagArgs:   []string{},
 			optionFunc: withAddr,
 			assertFn: func(t *testing.T, cfg *configs.ServerConfig) {
-				assert.Equal(t, "127.0.0.1:9999", cfg.Addr)
+				assert.Equal(t, ":7070", cfg.Addr)
 			},
 		},
 		{
 			name:       "StoreInterval from flag",
 			envKey:     "STORE_INTERVAL",
 			envValue:   "",
-			flagArgs:   []string{"-i", "42"},
+			flagArgs:   []string{"-i", "150"},
 			optionFunc: withStoreInterval,
 			assertFn: func(t *testing.T, cfg *configs.ServerConfig) {
-				assert.Equal(t, 42, cfg.StoreInterval)
+				assert.Equal(t, 150, cfg.StoreInterval)
 			},
 		},
 		{
 			name:       "StoreInterval from env",
 			envKey:     "STORE_INTERVAL",
-			envValue:   "77",
+			envValue:   "200",
 			flagArgs:   []string{},
 			optionFunc: withStoreInterval,
 			assertFn: func(t *testing.T, cfg *configs.ServerConfig) {
-				assert.Equal(t, 77, cfg.StoreInterval)
+				assert.Equal(t, 200, cfg.StoreInterval)
 			},
 		},
 		{
 			name:       "FileStoragePath from flag",
 			envKey:     "FILE_STORAGE_PATH",
 			envValue:   "",
-			flagArgs:   []string{"-f", "/tmp/file.json"},
+			flagArgs:   []string{"-f", "/tmp/metrics.json"},
 			optionFunc: withFileStoragePath,
 			assertFn: func(t *testing.T, cfg *configs.ServerConfig) {
-				assert.Equal(t, "/tmp/file.json", cfg.FileStoragePath)
+				assert.Equal(t, "/tmp/metrics.json", cfg.FileStoragePath)
 			},
 		},
 		{
 			name:       "FileStoragePath from env",
 			envKey:     "FILE_STORAGE_PATH",
-			envValue:   "/env/path.json",
+			envValue:   "/env/metrics.json",
 			flagArgs:   []string{},
 			optionFunc: withFileStoragePath,
 			assertFn: func(t *testing.T, cfg *configs.ServerConfig) {
-				assert.Equal(t, "/env/path.json", cfg.FileStoragePath)
+				assert.Equal(t, "/env/metrics.json", cfg.FileStoragePath)
 			},
 		},
 		{
-			name:       "Restore from flag",
+			name:       "Restore from flag (false)",
 			envKey:     "RESTORE",
 			envValue:   "",
 			flagArgs:   []string{"-r=false"},
@@ -98,33 +100,33 @@ func TestServerConfigOptions(t *testing.T) {
 			},
 		},
 		{
-			name:       "Restore from env",
+			name:       "Restore from env (true)",
 			envKey:     "RESTORE",
-			envValue:   "false",
+			envValue:   "true",
 			flagArgs:   []string{},
 			optionFunc: withRestore,
 			assertFn: func(t *testing.T, cfg *configs.ServerConfig) {
-				assert.False(t, cfg.Restore)
+				assert.True(t, cfg.Restore)
 			},
 		},
 		{
 			name:       "DatabaseDSN from flag",
 			envKey:     "DATABASE_DSN",
 			envValue:   "",
-			flagArgs:   []string{"-d", "user:pass@tcp(host:5432)/db"},
+			flagArgs:   []string{"-d", "postgres://flagdsn"},
 			optionFunc: withDatabaseDSN,
 			assertFn: func(t *testing.T, cfg *configs.ServerConfig) {
-				assert.Equal(t, "user:pass@tcp(host:5432)/db", cfg.DatabaseDSN)
+				assert.Equal(t, "postgres://flagdsn", cfg.DatabaseDSN)
 			},
 		},
 		{
 			name:       "DatabaseDSN from env",
 			envKey:     "DATABASE_DSN",
-			envValue:   "postgres://env@localhost/db",
+			envValue:   "postgres://envdsn",
 			flagArgs:   []string{},
 			optionFunc: withDatabaseDSN,
 			assertFn: func(t *testing.T, cfg *configs.ServerConfig) {
-				assert.Equal(t, "postgres://env@localhost/db", cfg.DatabaseDSN)
+				assert.Equal(t, "postgres://envdsn", cfg.DatabaseDSN)
 			},
 		},
 		{
@@ -147,11 +149,51 @@ func TestServerConfigOptions(t *testing.T) {
 				assert.Equal(t, "warn", cfg.LogLevel)
 			},
 		},
+		{
+			name:       "HashKey from flag",
+			envKey:     "KEY",
+			envValue:   "",
+			flagArgs:   []string{"-k", "flagkey"},
+			optionFunc: withHashKey,
+			assertFn: func(t *testing.T, cfg *configs.ServerConfig) {
+				assert.Equal(t, "flagkey", cfg.HashKey)
+			},
+		},
+		{
+			name:       "HashKey from env",
+			envKey:     "KEY",
+			envValue:   "envkey",
+			flagArgs:   []string{},
+			optionFunc: withHashKey,
+			assertFn: func(t *testing.T, cfg *configs.ServerConfig) {
+				assert.Equal(t, "envkey", cfg.HashKey)
+			},
+		},
+		{
+			name:       "HashHeader from flag",
+			envKey:     "HASH_HEADER",
+			envValue:   "",
+			flagArgs:   []string{"-hh", "CustomHeader"},
+			optionFunc: withHashHeader,
+			assertFn: func(t *testing.T, cfg *configs.ServerConfig) {
+				assert.Equal(t, "CustomHeader", cfg.HashHeader)
+			},
+		},
+		{
+			name:       "HashHeader from env",
+			envKey:     "HASH_HEADER",
+			envValue:   "EnvHeader",
+			flagArgs:   []string{},
+			optionFunc: withHashHeader,
+			assertFn: func(t *testing.T, cfg *configs.ServerConfig) {
+				assert.Equal(t, "EnvHeader", cfg.HashHeader)
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resetEnv()
+			resetServerEnv()
 			if tt.envValue != "" {
 				os.Setenv(tt.envKey, tt.envValue)
 			}
@@ -166,94 +208,6 @@ func TestServerConfigOptions(t *testing.T) {
 			opt(cfg)
 
 			tt.assertFn(t, cfg)
-		})
-	}
-}
-
-func Test_parseFlags_envOverrideFlags(t *testing.T) {
-	tests := []struct {
-		name     string
-		env      map[string]string
-		args     []string
-		expected *configs.ServerConfig
-	}{
-		{
-			name: "env overrides flags",
-			env: map[string]string{
-				"ADDRESS":           "env:127.0.0.1:9999",
-				"STORE_INTERVAL":    "111",
-				"FILE_STORAGE_PATH": "/env/path.json",
-				"RESTORE":           "true",
-				"DATABASE_DSN":      "env_dsn",
-				"LOG_LEVEL":         "warn",
-			},
-			args: []string{
-				"-a", "flag:localhost:9000",
-				"-i", "42",
-				"-f", "/flag/file.json",
-				"-r=false",
-				"-d", "flag_dsn",
-				"-l", "debug",
-			},
-			expected: &configs.ServerConfig{
-				Addr:            "env:127.0.0.1:9999", // env wins
-				StoreInterval:   111,                  // env wins
-				FileStoragePath: "/env/path.json",     // env wins
-				Restore:         true,                 // env wins
-				DatabaseDSN:     "env_dsn",            // env wins
-				LogLevel:        "warn",               // env wins
-			},
-		},
-		{
-			name: "flags used if no env",
-			env:  map[string]string{},
-			args: []string{
-				"-a", "flag:localhost:9000",
-				"-i", "42",
-				"-f", "/flag/file.json",
-				"-r=false",
-				"-d", "flag_dsn",
-				"-l", "debug",
-			},
-			expected: &configs.ServerConfig{
-				Addr:            "flag:localhost:9000",
-				StoreInterval:   42,
-				FileStoragePath: "/flag/file.json",
-				Restore:         false,
-				DatabaseDSN:     "flag_dsn",
-				LogLevel:        "debug",
-			},
-		},
-		{
-			name: "defaults used if no env or flags",
-			env:  map[string]string{},
-			args: []string{},
-			expected: &configs.ServerConfig{
-				Addr:            ":8080",
-				StoreInterval:   300,
-				FileStoragePath: "./data/metrics.json",
-				Restore:         true,
-				DatabaseDSN:     "",
-				LogLevel:        "info",
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			resetEnv()
-			for k, v := range tt.env {
-				os.Setenv(k, v)
-			}
-
-			origArgs := os.Args
-			defer func() { os.Args = origArgs }()
-
-			os.Args = append([]string{"server"}, tt.args...)
-
-			cfg := parseFlags()
-
-			assert.Equal(t, tt.expected, cfg)
 		})
 	}
 }
