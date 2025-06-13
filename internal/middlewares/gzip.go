@@ -12,7 +12,7 @@ func GzipMiddleware(next http.Handler) http.Handler {
 		if r.Header.Get("Content-Encoding") == "gzip" {
 			gzReader, err := gzip.NewReader(r.Body)
 			if err != nil {
-				http.Error(w, "Failed to decompress request", http.StatusBadRequest)
+				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
 			defer gzReader.Close()
