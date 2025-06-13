@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/sbilibin2017/yp-metrics/internal/logger"
 	"github.com/sbilibin2017/yp-metrics/internal/types"
 	"github.com/sbilibin2017/yp-metrics/internal/validators"
 )
@@ -23,13 +24,13 @@ func MetricUpdatesBodyHandler(
 		dec := json.NewDecoder(r.Body)
 		dec.DisallowUnknownFields()
 		if err := dec.Decode(&metrics); err != nil {
+			logger.Log.Errorf("Failed to decode JSON body: %v", err)
 			http.Error(w, "Invalid JSON body: "+err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		for _, metric := range metrics {
 			err := val(metric)
-
 			if err != nil {
 				switch err {
 				case validators.ErrNameIsRequired:
@@ -39,6 +40,8 @@ func MetricUpdatesBodyHandler(
 					validators.ErrInvalidCounterValue,
 					validators.ErrTypeIsRequired,
 					validators.ErrValueIsRequired:
+					http.Error(w, err.Error(), http.StatusBadRequest)
+				default:
 					http.Error(w, err.Error(), http.StatusBadRequest)
 				}
 				return
@@ -58,5 +61,7 @@ func MetricUpdatesBodyHandler(
 			http.Error(w, types.ErrInternalServerError.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		logger.Log.Info("Response sent successfully")
 	}
 }

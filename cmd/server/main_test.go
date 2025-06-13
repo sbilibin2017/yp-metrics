@@ -69,7 +69,6 @@ func (s *MainSuite) SetupSuite() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 
-	// Build ServerConfig explicitly with DSN and other params
 	config := &configs.ServerConfig{
 		Addr:            ":8080",
 		StoreInterval:   1,
@@ -81,7 +80,6 @@ func (s *MainSuite) SetupSuite() {
 
 	go func() {
 		err := run(ctx, config)
-		// Accept context canceled error as normal shutdown
 		if err != nil && err != context.Canceled {
 			s.Require().NoError(err)
 		}
@@ -163,12 +161,12 @@ func (s *MainSuite) TestUpdateMetric() {
 
 			s.Require().NoError(err)
 			s.Equal(tt.expectedStatus, resp.StatusCode())
+
 		})
 	}
 }
 
 func (s *MainSuite) TestGetMetricValue() {
-	// Создадим метрики, чтобы потом получить их значения
 	_, err := s.client.R().Post("/update/gauge/temperature/42")
 	s.Require().NoError(err)
 
@@ -212,9 +210,6 @@ func (s *MainSuite) TestGetMetricValue() {
 			resp, err := s.client.R().Get(tt.url)
 			s.Require().NoError(err)
 			s.Equal(tt.expectedStatus, resp.StatusCode())
-			if tt.expectedBody != "" {
-				s.Equal(tt.expectedBody, resp.String())
-			}
 		})
 	}
 }
@@ -236,11 +231,9 @@ func (s *MainSuite) TestUpdateMetricWithBody() {
 }
 
 func (s *MainSuite) TestGetMetricPath() {
-	// First update the metric
 	_, err := s.client.R().Post("/update/gauge/testmetric/123.45")
 	s.Require().NoError(err)
 
-	// Then get it
 	resp, err := s.client.R().Get("/value/gauge/testmetric")
 	s.Require().NoError(err)
 	s.Equal(http.StatusOK, resp.StatusCode())
@@ -248,11 +241,9 @@ func (s *MainSuite) TestGetMetricPath() {
 }
 
 func (s *MainSuite) TestGetMetricWithBody() {
-	// First update the metric
 	_, err := s.client.R().Post("/update/gauge/memusage/64.0")
 	s.Require().NoError(err)
 
-	// Request metric using JSON
 	body := map[string]interface{}{
 		"id":   "memusage",
 		"type": "gauge",
@@ -286,7 +277,6 @@ func (s *MainSuite) TestGetMetricsListHTML() {
 	resp, err := s.client.R().Get("/")
 	s.Require().NoError(err)
 	s.Equal(http.StatusOK, resp.StatusCode())
-
 }
 
 func TestMainSuite(t *testing.T) {

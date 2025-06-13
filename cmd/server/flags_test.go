@@ -196,12 +196,14 @@ func Test_parseFlags_envOverrideFlags(t *testing.T) {
 				"-l", "debug",
 			},
 			expected: &configs.ServerConfig{
-				Addr:            "env:127.0.0.1:9999", // env wins
-				StoreInterval:   111,                  // env wins
-				FileStoragePath: "/env/path.json",     // env wins
-				Restore:         true,                 // env wins
-				DatabaseDSN:     "env_dsn",            // env wins
-				LogLevel:        "warn",               // env wins
+				Addr:            "env:127.0.0.1:9999",
+				StoreInterval:   111,
+				FileStoragePath: "/env/path.json",
+				Restore:         true,
+				DatabaseDSN:     "env_dsn",
+				LogLevel:        "warn",
+				HashKey:         "",
+				HashHeader:      "HashSHA256",
 			},
 		},
 		{
@@ -222,6 +224,8 @@ func Test_parseFlags_envOverrideFlags(t *testing.T) {
 				Restore:         false,
 				DatabaseDSN:     "flag_dsn",
 				LogLevel:        "debug",
+				HashKey:         "",
+				HashHeader:      "HashSHA256",
 			},
 		},
 		{
@@ -235,6 +239,8 @@ func Test_parseFlags_envOverrideFlags(t *testing.T) {
 				Restore:         true,
 				DatabaseDSN:     "",
 				LogLevel:        "info",
+				HashKey:         "",
+				HashHeader:      "HashSHA256",
 			},
 		},
 	}

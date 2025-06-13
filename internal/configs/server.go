@@ -8,6 +8,7 @@ type ServerConfig struct {
 	DatabaseDSN     string
 	LogLevel        string
 	HashKey         string
+	HashHeader      string
 }
 
 type ServerOption func(*ServerConfig)

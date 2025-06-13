@@ -23,7 +23,7 @@ func NewAgentApp(cfg *configs.AgentConfig) (*AgentApp, error) {
 	}
 
 	client := resty.New()
-	metricFacade := facades.NewMetricUpdateFacade(client, cfg.Address, cfg.HashKey)
+	metricFacade := facades.NewMetricUpdateFacade(client, cfg.Address, cfg.HashKey, cfg.HashHeader)
 
 	workersList := []func(ctx context.Context){
 		func(ctx context.Context) {

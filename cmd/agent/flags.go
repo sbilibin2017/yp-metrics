@@ -17,6 +17,7 @@ func parseFlags() *configs.AgentConfig {
 		withReportInterval(fs),
 		withLogLevel(fs),
 		withHashKey(fs),
+		withHashHeader(fs),
 	}
 
 	fs.Parse(os.Args[1:])
@@ -89,6 +90,19 @@ func withHashKey(fs *flag.FlagSet) configs.AgentOption {
 			cfg.HashKey = env
 		} else {
 			cfg.HashKey = key
+		}
+	}
+}
+
+func withHashHeader(fs *flag.FlagSet) configs.AgentOption {
+	var header string
+	fs.StringVar(&header, "hh", "HashSHA256", "header name for hash")
+
+	return func(cfg *configs.AgentConfig) {
+		if env := os.Getenv("HASH_HEADER"); env != "" {
+			cfg.HashHeader = env
+		} else {
+			cfg.HashHeader = header
 		}
 	}
 }

@@ -100,8 +100,8 @@ func NewServerApp(config *configs.ServerConfig) (*ServerApp, error) {
 
 	middlewares := []func(http.Handler) http.Handler{
 		middlewares.LoggingMiddleware,
+		middlewares.HashMiddleware(config.HashKey, config.HashHeader),
 		middlewares.GzipMiddleware,
-		middlewares.HashMiddleware(config.HashKey),
 		middlewares.TxMiddleware(db, contexts.SetTxToContext),
 		middlewares.RetryMiddleware,
 	}

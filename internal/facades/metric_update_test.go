@@ -20,7 +20,7 @@ func TestMetricUpdateFacade_Update_Success(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
 
-		receivedHash = r.Header.Get("HashSHA256")
+		receivedHash = r.Header.Get("HashSHA256") // ожидаем заголовок с этим именем
 		assert.NotEmpty(t, receivedHash)
 
 		w.WriteHeader(http.StatusOK)
@@ -29,7 +29,9 @@ func TestMetricUpdateFacade_Update_Success(t *testing.T) {
 
 	client := resty.New()
 	secretKey := "supersecretkey"
-	facade := NewMetricUpdateFacade(client, ts.URL, secretKey)
+	hashHeader := "HashSHA256" // теперь нужно передавать этот параметр в конструктор
+
+	facade := NewMetricUpdateFacade(client, ts.URL, secretKey, hashHeader)
 
 	val := 42.0
 	m := types.Metrics{
@@ -43,7 +45,6 @@ func TestMetricUpdateFacade_Update_Success(t *testing.T) {
 	err := facade.Updates(context.Background(), req)
 	assert.NoError(t, err)
 
-	// Считаем хеш от НЕсжатого JSON + secretKey
 	jsonData, err := json.Marshal(req)
 	assert.NoError(t, err)
 

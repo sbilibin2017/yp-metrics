@@ -150,10 +150,12 @@ func TestParseFlagsEnvOverridesFlags(t *testing.T) {
 				"-l", "info",
 			},
 			expected: &configs.AgentConfig{
-				Address:        "http://env:8080", // env wins
-				PollInterval:   11,                // env wins
-				ReportInterval: 22,                // env wins
-				LogLevel:       "warn",            // env wins
+				Address:        "http://env:8080",
+				PollInterval:   11,
+				ReportInterval: 22,
+				LogLevel:       "warn",
+				HashKey:        "",
+				HashHeader:     "HashSHA256",
 			},
 		},
 		{
@@ -170,6 +172,8 @@ func TestParseFlagsEnvOverridesFlags(t *testing.T) {
 				PollInterval:   1,
 				ReportInterval: 2,
 				LogLevel:       "info",
+				HashKey:        "",
+				HashHeader:     "HashSHA256",
 			},
 		},
 		{
@@ -181,6 +185,8 @@ func TestParseFlagsEnvOverridesFlags(t *testing.T) {
 				PollInterval:   2,
 				ReportInterval: 10,
 				LogLevel:       "info",
+				HashKey:        "",
+				HashHeader:     "HashSHA256",
 			},
 		},
 	}

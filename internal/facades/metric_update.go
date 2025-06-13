@@ -1,8 +1,6 @@
 package facades
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -19,9 +17,15 @@ type MetricUpdateFacade struct {
 	client     *resty.Client
 	serverAddr string
 	secretKey  string
+	hashHeader string
 }
 
-func NewMetricUpdateFacade(client *resty.Client, serverAddr string, secretKey string) *MetricUpdateFacade {
+func NewMetricUpdateFacade(
+	client *resty.Client,
+	serverAddr string,
+	secretKey string,
+	hashHeader string,
+) *MetricUpdateFacade {
 	client.
 		SetRetryCount(3).
 		SetRetryWaitTime(1 * time.Second).
@@ -34,6 +38,7 @@ func NewMetricUpdateFacade(client *resty.Client, serverAddr string, secretKey st
 		client:     client,
 		serverAddr: serverAddr,
 		secretKey:  secretKey,
+		hashHeader: hashHeader,
 	}
 }
 
@@ -49,30 +54,20 @@ func (f *MetricUpdateFacade) Updates(ctx context.Context, req []types.Metrics) e
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	var hashHeader string
+	var computedHash string
 	if f.secretKey != "" {
 		sum := sha256.Sum256(append(jsonData, []byte(f.secretKey)...))
-		hashHeader = hex.EncodeToString(sum[:])
+		computedHash = hex.EncodeToString(sum[:])
 	}
-
-	var compressedBuf bytes.Buffer
-	gzw := gzip.NewWriter(&compressedBuf)
-	if _, err := gzw.Write(jsonData); err != nil {
-		return fmt.Errorf("gzip write failed: %w", err)
-	}
-	if err := gzw.Close(); err != nil {
-		return fmt.Errorf("gzip close failed: %w", err)
-	}
-	compressedBody := compressedBuf.Bytes()
 
 	reqBuilder := f.client.R().
 		SetContext(ctx).
-		SetBody(compressedBody).
+		SetBody(jsonData).
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Content-Encoding", "gzip")
 
-	if hashHeader != "" {
-		reqBuilder.SetHeader("HashSHA256", hashHeader)
+	if computedHash != "" {
+		reqBuilder.SetHeader(f.hashHeader, computedHash)
 	}
 
 	resp, err := reqBuilder.Post(addr)

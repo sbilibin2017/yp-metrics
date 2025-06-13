@@ -19,6 +19,7 @@ func parseFlags() *configs.ServerConfig {
 		withDatabaseDSN(fs),
 		withLogLevel(fs),
 		withHashKey(fs),
+		withHashHeader(fs),
 	}
 
 	fs.Parse(os.Args[1:])
@@ -117,6 +118,19 @@ func withHashKey(fs *flag.FlagSet) configs.ServerOption {
 			cfg.HashKey = env
 		} else {
 			cfg.HashKey = key
+		}
+	}
+}
+
+func withHashHeader(fs *flag.FlagSet) configs.ServerOption {
+	var header string
+	fs.StringVar(&header, "hh", "HashSHA256", "header name for hash")
+
+	return func(cfg *configs.ServerConfig) {
+		if env := os.Getenv("HASH_HEADER"); env != "" {
+			cfg.HashHeader = env
+		} else {
+			cfg.HashHeader = header
 		}
 	}
 }
